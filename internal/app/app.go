@@ -2,16 +2,23 @@ package app
 
 import (
 	"context"
+	"log"
 	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/amicie-monami/music-library/config"
+	"github.com/amicie-monami/music-library/internal/repo"
 	"github.com/amicie-monami/music-library/internal/server"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jmoiron/sqlx"
 )
 
 func Run(ctx context.Context, config *config.Config) {
-	server := server.New(config)
+	db := databaseConnect(config.Database.Source)
+	songRepo := repo.NewSong(db)
+	server := server.New(config, songRepo)
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 
@@ -32,7 +39,19 @@ func Run(ctx context.Context, config *config.Config) {
 		if err := server.Shutdown(ctx); err != nil {
 			slog.Error("http server shutdown", "msg", err)
 		}
+		slog.Debug("http server was successfully shutdown")
 	}()
 
 	wg.Wait()
+}
+
+func databaseConnect(source string) *sqlx.DB {
+	db, err := sqlx.Open("pgx", source)
+	if err != nil {
+		log.Fatalf("failed to connect to database, msg=%s", err)
+	}
+	if err := db.Ping(); err != nil {
+		log.Fatalf("failed to connect to database, msg=%s", err)
+	}
+	return db
 }

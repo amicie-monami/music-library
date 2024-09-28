@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"log/slog"
 	"os/signal"
 	"syscall"
 
@@ -11,6 +12,7 @@ import (
 )
 
 func main() {
+	slog.SetLogLoggerLevel(slog.LevelDebug)
 	flag.Parse()
 	config := config.MustLoadFromEnv()
 	// subcribe on terminate and quit signals

@@ -1,17 +1,34 @@
 package router
 
-import "net/http"
+import (
+	"net/http"
+)
 
-// method = handler
 type route struct {
 	handler http.Handler
-	methods []string
+	methods map[string]struct{}
 }
 
 func newRoute(handler http.Handler) *route {
-	return &route{methods: make([]string, 0), handler: handler}
+	return &route{methods: make(map[string]struct{}, 0), handler: handler}
 }
 
-func (r *route) Methods(methods ...string) {
-	r.methods = append(r.methods, methods...)
+func (rt *route) Methods(methods ...string) {
+	for idx := range methods {
+		method := methods[idx]
+		rt.methods[method] = struct{}{}
+	}
+}
+
+func (rt *route) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if !rt.checkMethod(r.Method) {
+		w.Write([]byte("Method not allowed"))
+		return
+	}
+	rt.handler.ServeHTTP(w, r)
+}
+
+func (rt *route) checkMethod(method string) bool {
+	_, ok := rt.methods[method]
+	return ok
 }

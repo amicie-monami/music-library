@@ -23,9 +23,14 @@ type ServerConfig struct {
 	MaxHeaderBytes int
 }
 
+type DatabaseConfig struct {
+	Source string
+}
+
 // Config stores the configuration of the application
 type Config struct {
-	Server ServerConfig
+	Server   ServerConfig
+	Database DatabaseConfig
 }
 
 // MustLoadFromEnv loads config from .env file
@@ -47,6 +52,9 @@ func MustLoadFromEnv() *Config {
 			WriteTimeout:   mustParseDigit(env["SERVER_WRITE_TIMEOUT"]),
 			IdleTimeout:    mustParseDigit(env["SERVER_IDLE_TIMEOUT"]),
 			MaxHeaderBytes: mustParseDigit(env["SERVER_MAX_HEADER_BYTES"]),
+		},
+		Database: DatabaseConfig{
+			Source: env["DATABASE_SOURCE"],
 		},
 	}
 }

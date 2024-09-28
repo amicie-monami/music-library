@@ -4,31 +4,26 @@ import (
 	"net/http"
 )
 
-// endpoint = route
 type Router struct {
-	routes      map[string]*route
-	mux         *http.ServeMux
-	middlewares []http.Handler
+	routes map[string]*route
+	mux    *http.ServeMux
 }
 
 func New() *Router {
-	return &Router{routes: make(map[string]*route), mux: http.NewServeMux(), middlewares: make([]http.Handler, 0)}
+	return &Router{routes: make(map[string]*route), mux: http.NewServeMux()}
 }
 
 // Handle creates endpoint route
 func (rt *Router) Handle(endpoint string, handler http.Handler) *route {
-	route := newRoute(handler)
-	rt.routes["enpoint"] = route
-	return route
-}
-
-// Use sets global middlewares
-func (rt *Router) Use(middleware http.Handler) {
-	rt.middlewares = append(rt.middlewares, middleware)
+	rt.routes[endpoint] = newRoute(handler)
+	return rt.routes[endpoint]
 }
 
 func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	for idx := range rt.middlewares {
-		rt.middlewares[idx].ServeHTTP(w, r)
+	route, ok := rt.routes[r.URL.Path]
+	if !ok {
+		http.NotFound(w, r)
+		return
 	}
+	route.ServeHTTP(w, r)
 }

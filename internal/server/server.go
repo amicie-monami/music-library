@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/amicie-monami/music-library/config"
-	"github.com/amicie-monami/music-library/internal/handler/v1"
-	"github.com/amicie-monami/music-library/pkg/router"
+	"github.com/amicie-monami/music-library/internal/repo"
+	"github.com/gorilla/mux"
 )
 
 // server wraps the http.Server
@@ -15,9 +15,9 @@ type server struct {
 	srv *http.Server
 }
 
-func New(config *config.Config) *server {
-	router := router.New()
-	configureRouter(router)
+func New(config *config.Config, songRepo *repo.Song) *server {
+	router := mux.NewRouter()
+	configureRouter(router, songRepo)
 	srv := &http.Server{
 		Addr:           config.Server.Addr,
 		ReadTimeout:    time.Duration(config.Server.ReadTimeout) * time.Second,
@@ -27,10 +27,6 @@ func New(config *config.Config) *server {
 		Handler:        router,
 	}
 	return &server{srv}
-}
-
-func configureRouter(router *router.Router) {
-	router.Handle("api/v1/songs", handler.AddSong()).Methods("POST")
 }
 
 // Run starts the server
