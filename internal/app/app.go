@@ -39,7 +39,7 @@ func Run(ctx context.Context, config *config.Config) {
 		if err := server.Shutdown(ctx); err != nil {
 			slog.Error("http server shutdown", "msg", err)
 		}
-		slog.Debug("http server was successfully shutdown")
+		slog.Info("http server was successfully shutdown")
 	}()
 
 	wg.Wait()

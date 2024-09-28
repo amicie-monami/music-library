@@ -31,7 +31,7 @@ func configureRouter(router *mux.Router, songRepo *repo.Song) {
 	router.Handle("/api/v1/songs/{id}", handler.DeleteSong(songRepo)).Methods("DELETE")
 
 	//update data of the song
-	router.Handle("/api/v1/songs/{id}", handler.UpdateSong()).Methods("PATCH")
+	router.Handle("/api/v1/songs/{id}", handler.UpdateSong(songRepo)).Methods("PATCH")
 
 	//add a song to the library
 	router.Handle("/api/v1/songs", handler.AddSong(songRepo)).Methods("POST")

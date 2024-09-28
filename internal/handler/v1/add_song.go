@@ -31,10 +31,7 @@ func AddSong(repo SongAdder) http.Handler {
 		}
 
 		//form song model
-		song := &model.Song{
-			Group: data.Group,
-			Title: data.Title,
-		}
+		song := &model.Song{Group: data.Group, Title: data.Title}
 
 		//add song to database
 		if err := repo.Create(song); err != nil {
@@ -45,7 +42,7 @@ func AddSong(repo SongAdder) http.Handler {
 			return
 		}
 
-		//marshal created song to json
+		//marshal a created song
 		response, err := json.Marshal(song)
 		if err != nil {
 			slog.Debug("failed to marshal song model to json", "msg", err)
