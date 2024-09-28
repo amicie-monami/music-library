@@ -38,9 +38,17 @@ func (r *Song) Create(song *model.Song) error {
 	return r.db.QueryRow(sql, args...).Scan(&song.ID)
 }
 
-func (r *Song) GetSongText(id int64) (string, error) {
+func (r *Song) GetSongText(id int64) (*string, error) {
+	slog.Debug("get song text", "id", id)
+	query := squirrel.
+		Select("text").
+		From("song_details").
+		Where(squirrel.Eq{"song_id": id}).
+		PlaceholderFormat(squirrel.Dollar)
 
-	return "", nil
+	sql, args := query.MustSql()
+	songText := new(string)
+	return songText, r.db.QueryRow(sql, args...).Scan(songText)
 }
 
 func (r *Song) GetSongDetails(group string, title string) (*model.SongDetail, error) {

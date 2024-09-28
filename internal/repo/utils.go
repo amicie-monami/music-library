@@ -18,7 +18,6 @@ func updateRow(db *sqlx.DB, table, pk_column string, pk any, fields map[string]a
 		PlaceholderFormat(squirrel.Dollar)
 
 	sql, args := query.MustSql()
-	fmt.Println(sql, args)
 
 	result, err := db.Exec(sql, args...)
 	if err != nil {

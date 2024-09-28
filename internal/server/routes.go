@@ -32,7 +32,7 @@ func configureRouter(router *mux.Router, songRepo *repo.Song) {
 	router.Handle("/api/v1/songs", handler.GetSongsData(songRepo)).Methods("GET")
 
 	//get the song text
-	router.Handle("/api/v1/songs/{id}", handler.GetSongText()).Methods("GET")
+	router.Handle("/api/v1/songs/{id}/lyrics", handler.GetSongText(songRepo)).Methods("GET")
 
 	//delete the song
 	router.Handle("/api/v1/songs/{id}", handler.DeleteSong(songRepo)).Methods("DELETE")
