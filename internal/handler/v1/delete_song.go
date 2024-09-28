@@ -1,7 +1,42 @@
 package handler
 
-import "net/http"
+import (
+	"log/slog"
+	"net/http"
+	"strconv"
 
-func DeleteSong() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+	"github.com/gorilla/mux"
+)
+
+type SongDeletter interface {
+	Delete(id int64) error
+}
+
+// DeleteSobg ...
+func DeleteSong(repo SongDeletter) http.Handler {
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		songIdStr := mux.Vars(r)["id"]
+		songId, err := strconv.ParseInt(songIdStr, 0, 10)
+		if err != nil {
+			slog.Debug("failed to parse song id", "value", songIdStr)
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(err.Error()))
+			return
+		}
+
+		//add song to database
+		if err := repo.Delete(songId); err != nil {
+			slog.Debug("failed to delete a song", "msg", err.Error())
+			// refactor -- checks error source, maybe it's http.ServerInternalError
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(err.Error()))
+			return
+		}
+
+		//response
+		w.WriteHeader(http.StatusOK)
+		slog.Debug("success", "status_code", http.StatusOK)
+	})
 }

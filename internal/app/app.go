@@ -45,12 +45,10 @@ func Run(ctx context.Context, config *config.Config) {
 	wg.Wait()
 }
 
+// databaseConnect connects to the database at the source address and pings it
 func databaseConnect(source string) *sqlx.DB {
 	db, err := sqlx.Open("pgx", source)
-	if err != nil {
-		log.Fatalf("failed to connect to database, msg=%s", err)
-	}
-	if err := db.Ping(); err != nil {
+	if err != nil || db.Ping() != nil {
 		log.Fatalf("failed to connect to database, msg=%s", err)
 	}
 	return db

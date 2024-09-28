@@ -19,14 +19,8 @@ func (r *Song) Create(song *model.Song) error {
 	return r.db.QueryRow(sql, args...).Scan(&song.ID)
 }
 
-func (r *Song) DeleteByID(id int64) error {
+func (r *Song) Delete(id int64) error {
 	sql, args := squirrel.Delete("songs").Where(squirrel.Eq{"id": id}).PlaceholderFormat(squirrel.Dollar).MustSql()
-	_, err := r.db.Exec(sql, args...)
-	return err
-}
-
-func (r *Song) DeleteByGroupAndTitle(group, title string) error {
-	sql, args := squirrel.Delete("songs").Where(squirrel.Eq{"group": group, "title": title}).PlaceholderFormat(squirrel.Dollar).MustSql()
 	_, err := r.db.Exec(sql, args...)
 	return err
 }
