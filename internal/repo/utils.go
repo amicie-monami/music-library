@@ -12,11 +12,13 @@ func updateRow(db *sqlx.DB, table, pk_column string, pk any, fields map[string]a
 		return nil
 	}
 
-	sql, args := squirrel.Update(table).
+	query := squirrel.Update(table).
 		SetMap(fields).
 		Where(squirrel.Eq{pk_column: pk}).
-		PlaceholderFormat(squirrel.Dollar).
-		MustSql()
+		PlaceholderFormat(squirrel.Dollar)
+
+	sql, args := query.MustSql()
+	fmt.Println(sql, args)
 
 	result, err := db.Exec(sql, args...)
 	if err != nil {

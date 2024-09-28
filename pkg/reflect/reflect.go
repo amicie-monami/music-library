@@ -1,11 +1,22 @@
 package reflect
 
-import "reflect"
+import (
+	"reflect"
+)
 
 func FillMapNotZeros(pairs map[string]any) map[string]any {
 	fields := make(map[string]any)
 	for key, value := range pairs {
-		if !reflect.ValueOf(value).IsZero() {
+		v := reflect.ValueOf(value)
+
+		if v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				continue
+			}
+			v = v.Elem()
+		}
+
+		if !v.IsZero() {
 			fields[key] = value
 		}
 	}

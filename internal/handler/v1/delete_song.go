@@ -20,7 +20,7 @@ func DeleteSong(repo SongDeletter) http.Handler {
 		songIdStr := mux.Vars(r)["id"]
 		songId, err := strconv.ParseInt(songIdStr, 0, 10)
 		if err != nil {
-			slog.Debug("failed to parse song id", "value", songIdStr)
+			slog.Info("failed to parse song id", "value", songIdStr)
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(err.Error()))
 			return
@@ -28,7 +28,7 @@ func DeleteSong(repo SongDeletter) http.Handler {
 
 		//add song to database
 		if err := repo.Delete(songId); err != nil {
-			slog.Debug("failed to delete a song", "msg", err.Error())
+			slog.Info("failed to delete a song", "msg", err.Error())
 			// refactor -- checks error source, maybe it's http.ServerInternalError
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(err.Error()))
@@ -37,6 +37,6 @@ func DeleteSong(repo SongDeletter) http.Handler {
 
 		//response
 		w.WriteHeader(http.StatusOK)
-		slog.Debug("success", "status_code", http.StatusOK)
+		slog.Info("success", "status_code", http.StatusOK)
 	})
 }
