@@ -63,7 +63,7 @@ func UpdateSong(repo songDataUpdater) http.Handler {
 		var song *model.Song
 		var songDetails *model.SongDetail
 		if data.Song != nil {
-			song = &model.Song{ID: songId, Group: data.Song.Group, Title: data.Song.Title}
+			song = &model.Song{ID: songId, Group: data.Song.Group, Name: data.Song.Title}
 		}
 
 		if data.SongDetails != nil {

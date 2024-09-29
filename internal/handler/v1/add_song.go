@@ -31,7 +31,7 @@ func AddSong(repo SongAdder) http.Handler {
 		}
 
 		//form song model
-		song := &model.Song{Group: data.Group, Title: data.Title}
+		song := &model.Song{Group: data.Group, Name: data.Title}
 
 		//add song to database
 		if err := repo.Create(song); err != nil {

@@ -1,25 +1,18 @@
 package usecase
 
 import (
-	"fmt"
-	"strings"
+	"github.com/amicie-monami/music-library/internal/model"
+	"github.com/amicie-monami/music-library/internal/repo"
 )
 
-func TextPagination(text string, offset int64, limit int64) ([]string, error) {
-	if limit == 0 {
-		limit = 1
-	}
+type Song struct {
+	repo *repo.Song
+}
 
-	couplets := strings.Split(text, "\n\n")
+func New(repo *repo.Song) *Song {
+	return &Song{repo}
+}
 
-	lenVerses := len(couplets)
-	if lenVerses < int(offset) {
-		return nil, fmt.Errorf("out of bounds")
-	}
-
-	if int(offset+limit) >= lenVerses {
-		return couplets[offset:], nil
-	}
-
-	return couplets[offset : offset+limit], nil
+func (u *Song) GetSongsData(aggregation map[string]any) ([]model.SongWithDetailsDTO, error) {
+	return u.repo.GetSongs(aggregation)
 }

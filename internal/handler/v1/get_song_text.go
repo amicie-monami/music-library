@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 
-	"github.com/gorilla/mux"
+	"github.com/amicie-monami/music-library/pkg/httpkit"
 )
 
 type songTextGetter interface {
@@ -17,21 +16,21 @@ type songTextGetter interface {
 
 func GetSongText(repo songTextGetter) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		songId, err := GetIntVar("id", r)
+		songId, err := httpkit.GetIntParam("id", r)
 		if err != nil {
 			slog.Info("failed to parse song id", "err", err)
 			w.Write([]byte(err.Error()))
 			return
 		}
 
-		offset, err := GetIntParam("offset", r)
+		offset, err := httpkit.GetIntParam("offset", r)
 		if err != nil {
 			slog.Info("failed to parse param 'offset'", "err", err)
 			w.Write([]byte(err.Error()))
 			return
 		}
 
-		limit, err := GetIntParam("limit", r)
+		limit, err := httpkit.GetIntParam("limit", r)
 		if err != nil {
 			slog.Info("failed to parse param 'limit'", "err", err)
 			w.Write([]byte(err.Error()))
@@ -63,10 +62,6 @@ func GetSongText(repo songTextGetter) http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(response)
 	})
-}
-
-func GetIntVar(key string, r *http.Request) (int64, error) {
-	return strconv.ParseInt(mux.Vars(r)[key], 0, 10)
 }
 
 func textPagination(text string, offset int64, limit int64) ([]string, error) {

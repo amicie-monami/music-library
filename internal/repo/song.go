@@ -3,6 +3,7 @@ package repo
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/Masterminds/squirrel"
 	"github.com/amicie-monami/music-library/internal/model"
@@ -30,12 +31,36 @@ func (r *Song) Create(song *model.Song) error {
 			"group_name",
 			"song_title",
 		).
-		Values(song.Group, song.Title).
+		Values(song.Group, song.Name).
 		PlaceholderFormat(squirrel.Dollar).
 		Suffix("RETURNING id")
 
 	sql, args := query.MustSql()
 	return r.db.QueryRow(sql, args...).Scan(&song.ID)
+}
+
+func (r *Song) GetSongs(aggregation map[string]any) ([]model.SongWithDetailsDTO, error) {
+	query := squirrel.Select().From("songs").Join("song_details ON songs.id = song_details.song_id")
+
+	if aggregation["fields"] == "" {
+		query = query.Columns(
+			"song_id",
+			"group_name",
+			"song_name",
+			"release_date",
+			"link",
+			"text",
+		)
+	} else {
+		columns := strings.Split(aggregation["fields"].(string), " ")
+		query = query.Columns(columns...)
+	}
+
+	sql, args := query.PlaceholderFormat(squirrel.Dollar).MustSql()
+
+	fmt.Println(sql)
+	songs := make([]model.SongWithDetailsDTO, 0)
+	return songs, r.db.Select(&songs, sql, args...)
 }
 
 func (r *Song) GetSongText(id int64) (*string, error) {
@@ -64,7 +89,7 @@ func (r *Song) GetSongDetails(group string, title string) (*model.SongDetail, er
 		Join("songs on songs.id = song_id").
 		Where(squirrel.Eq{
 			"songs.group_name": group,
-			"songs.song_title": title,
+			"songs.song_name":  title,
 		}).
 		PlaceholderFormat(squirrel.Dollar)
 
@@ -80,7 +105,7 @@ func (r *Song) UpdateSong(song *model.Song) error {
 	}
 	fields := reflect.FillMapNotZeros(map[string]any{
 		"group_name": song.Group,
-		"song_title": song.Title,
+		"song_name":  song.Name,
 	})
 	return updateRow(r.db, "songs", "id", song.ID, fields)
 }

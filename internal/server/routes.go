@@ -3,6 +3,7 @@ package server
 import (
 	"github.com/amicie-monami/music-library/internal/handler/v1"
 	"github.com/amicie-monami/music-library/internal/repo"
+	"github.com/amicie-monami/music-library/internal/usecase"
 	"github.com/amicie-monami/music-library/pkg/middleware"
 	"github.com/gorilla/mux"
 )
@@ -24,12 +25,11 @@ import (
 	6. /info
 */
 
-func configureRouter(router *mux.Router, songRepo *repo.Song) {
+func configureRouter(router *mux.Router, songRepo *repo.Song, songUsecase *usecase.Song) {
 	//logs every request
 	router.Use(middleware.Log)
 
-	//get library data
-	router.Handle("/api/v1/songs", handler.GetSongsData(songRepo)).Methods("GET")
+	router.Handle("/api/v1/songs", handler.GetSongsData(songUsecase)).Methods("GET")
 
 	//get the song text
 	router.Handle("/api/v1/songs/{id}/lyrics", handler.GetSongText(songRepo)).Methods("GET")
