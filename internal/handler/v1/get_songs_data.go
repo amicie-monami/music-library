@@ -7,12 +7,12 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/amicie-monami/music-library/internal/model"
+	"github.com/amicie-monami/music-library/internal/domain/dto"
 	"github.com/amicie-monami/music-library/pkg/httpkit"
 )
 
 type songDataGetter interface {
-	GetSongsData(aggregation map[string]any) ([]model.SongWithDetailsDTO, error)
+	GetSongs(aggregation map[string]any) ([]dto.SongWithDetails, error)
 }
 
 // GetSongsData ...
@@ -25,7 +25,7 @@ func GetSongsData(usecase songDataGetter) http.Handler {
 			return
 		}
 
-		data, err := usecase.GetSongsData(params)
+		data, err := usecase.GetSongs(params)
 		if err != nil {
 			slog.Info(err.Error())
 			w.Write([]byte(err.Error()))

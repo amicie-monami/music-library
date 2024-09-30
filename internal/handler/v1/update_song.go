@@ -6,7 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/amicie-monami/music-library/internal/model"
+	"github.com/amicie-monami/music-library/internal/domain/dto"
+	"github.com/amicie-monami/music-library/internal/domain/model"
 	"github.com/gorilla/mux"
 )
 
@@ -17,22 +18,6 @@ type songDataUpdater interface {
 }
 
 func UpdateSong(repo songDataUpdater) http.Handler {
-
-	type UpdateSongDTO struct {
-		Group string `json:"group,omitempty"`
-		Title string `json:"title,omitempty"`
-	}
-
-	type SongDetailsDTO struct {
-		Text        *string `json:"text,omitempty"`
-		Link        *string `json:"link,omitempty"`
-		ReleaseDate *string `json:"release_date,omitempty"`
-	}
-
-	type UpdateSongRequest struct {
-		Song        *UpdateSongDTO  `json:"song"`
-		SongDetails *SongDetailsDTO `json:"song_details"`
-	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		songIdStr := mux.Vars(r)["id"]
@@ -45,7 +30,7 @@ func UpdateSong(repo songDataUpdater) http.Handler {
 		}
 
 		//parse the request body
-		var data UpdateSongRequest
+		var data dto.UpdateSongRequest
 		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
 			slog.Info("invalid request body", "msg", err.Error())
 			w.WriteHeader(http.StatusBadRequest)

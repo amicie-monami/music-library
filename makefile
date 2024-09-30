@@ -15,6 +15,9 @@ migrate_force: check_db check_v
 migrate_down:
 	@${MIGRATE_BODY} down
 
+get_songs:
+	@curl -X GET "http://localhost:8080/api/v1/songs?filter=${filter}" | jq
+
 check_db:
 ifndef db
 	@$(error parameter db is required [database name])

@@ -7,7 +7,6 @@ import (
 
 	"github.com/amicie-monami/music-library/config"
 	"github.com/amicie-monami/music-library/internal/repo"
-	"github.com/amicie-monami/music-library/internal/usecase"
 	"github.com/gorilla/mux"
 )
 
@@ -18,7 +17,7 @@ type server struct {
 
 func New(config *config.Config, songRepo *repo.Song) *server {
 	router := mux.NewRouter()
-	configureRouter(router, songRepo, usecase.New(songRepo))
+	configureRouter(router, songRepo)
 	srv := &http.Server{
 		Addr:           config.Server.Addr,
 		ReadTimeout:    time.Duration(config.Server.ReadTimeout) * time.Second,

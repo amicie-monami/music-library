@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/amicie-monami/music-library/internal/model"
+	"github.com/amicie-monami/music-library/internal/domain/model"
 )
 
 type SongAdder interface {
