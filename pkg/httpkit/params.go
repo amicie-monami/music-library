@@ -39,7 +39,7 @@ func GetStrParam(key string, r *http.Request) string {
 func getQueryParam(key string, r *http.Request) (string, error) {
 	param := r.URL.Query().Get(key)
 	if param == "" {
-		return "", fmt.Errorf("param %s is missing", key)
+		return "", fmt.Errorf("param %s is required", key)
 	}
 	return param, nil
 }

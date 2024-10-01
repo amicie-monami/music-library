@@ -4,82 +4,91 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"strconv"
 
 	"github.com/amicie-monami/music-library/internal/domain/dto"
 	"github.com/amicie-monami/music-library/internal/domain/model"
-	"github.com/gorilla/mux"
+	"github.com/amicie-monami/music-library/pkg/httpkit"
 )
 
 type songDataUpdater interface {
 	Tx(txActions func() error) error
-	UpdateSong(song *model.Song) error
-	UpdateSongDetails(details *model.SongDetail) error
+	UpdateSong(song *model.Song) (count int64, err error)
+	UpdateSongDetails(details *model.SongDetail) (count int64, err error)
 }
 
 func UpdateSong(repo songDataUpdater) http.Handler {
-
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		songIdStr := mux.Vars(r)["id"]
-		songId, err := strconv.ParseInt(songIdStr, 0, 10)
+		songID, songIDVar, err := parsePathVarSongID(r)
 		if err != nil {
-			slog.Info("invalid song id", "value", songIdStr)
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(err.Error()))
+			slog.Info(err.Error())
+			httpkit.BadRequest(w, map[string]any{"error": "invalid song id", "song_id": songIDVar})
 			return
 		}
 
-		//parse the request body
-		var data dto.UpdateSongRequest
-		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-			slog.Info("invalid request body", "msg", err.Error())
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(err.Error()))
-			return
-		}
-
-		if data.Song == nil && data.SongDetails == nil {
-			slog.Info("missing data for updates")
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("missing data for updates"))
-			return
-		}
-
-		var song *model.Song
-		var songDetails *model.SongDetail
-		if data.Song != nil {
-			song = &model.Song{ID: songId, Group: data.Song.Group, Name: data.Song.Title}
-		}
-
-		if data.SongDetails != nil {
-			songDetails = &model.SongDetail{
-				SongID:      songId,
-				ReleaseDate: data.SongDetails.ReleaseDate,
-				Text:        data.SongDetails.Text,
-				Link:        data.SongDetails.Link,
-			}
-		}
-
-		err = repo.Tx(func() error {
-			if err := repo.UpdateSong(song); err != nil {
-				slog.Info("failed to update a song data", "msg", err.Error())
-				return err
-			}
-
-			if err := repo.UpdateSongDetails(songDetails); err != nil {
-				slog.Info("failed to update a song details", "msg", err.Error())
-				return err
-			}
-			return nil
-		})
-
+		//parse body
+		song, songDetails, err := parseUpdateSongBody(songID, r)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(err.Error()))
+			slog.Info("404" + err.Error())
+			httpkit.BadRequest(w, map[string]any{"error": err.Error()})
+			return
 		}
 
-		//response
-		w.WriteHeader(http.StatusOK)
-		slog.Info("success", "status_code", http.StatusOK)
+		//refactor: wrap in transaction
+		//sql query for song
+		count, err := repo.UpdateSong(song)
+		if err != nil {
+			slog.Error("404 failed to update a song data", "msg", err.Error())
+			httpkit.InternalError(w)
+			return
+		} else if count == 0 {
+			slog.Info("404 song not found", "song_id", songID)
+			httpkit.BadRequest(w, map[string]any{"error": "song not found", "song_id": songID})
+			return
+		}
+
+		//sql query for song details
+		count, err = repo.UpdateSongDetails(songDetails)
+		if err != nil {
+			slog.Info("500 failed to update a song details", "msg", err.Error())
+			httpkit.InternalError(w)
+			return
+		} else if count == 0 {
+			slog.Info("404 song details not found", "song_id", songID)
+			httpkit.BadRequest(w, map[string]any{"error": "song not found", "song_id": songID})
+			return
+		}
+
+		slog.Info("200")
 	})
+}
+
+func parseUpdateSongBody(songID int64, r *http.Request) (*model.Song, *model.SongDetail, error) {
+	var (
+		body        dto.UpdateSongRequest
+		song        *model.Song
+		songDetails *model.SongDetail
+	)
+
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		return nil, nil, err
+	}
+
+	if body.Song != nil {
+		song = &model.Song{
+			ID:    songID,
+			Group: body.Song.Group,
+			Name:  body.Song.Name,
+		}
+	}
+
+	if body.SongDetails != nil {
+		songDetails = &model.SongDetail{
+			SongID:      songID,
+			ReleaseDate: body.SongDetails.ReleaseDate,
+			Text:        body.SongDetails.Text,
+			Link:        body.SongDetails.Link,
+		}
+	}
+
+	return song, songDetails, nil
 }

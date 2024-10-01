@@ -48,7 +48,7 @@ func buildSongIDCondition(paramSongID string) (squirrel.Sqlizer, error) {
 	songID := songIDConstraint[0]
 
 	if len(songIDConstraint) == 2 {
-		comparison := parseComparison(songIDConstraint[0])
+		comparison = parseComparison(songIDConstraint[0])
 		if comparison == "" {
 			return nil, fmt.Errorf("invalid comparison operator in sond_id param")
 		}

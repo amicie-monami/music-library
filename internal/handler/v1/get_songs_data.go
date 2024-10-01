@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -15,97 +14,48 @@ type songDataGetter interface {
 	GetSongs(aggregation map[string]any) ([]dto.SongWithDetails, error)
 }
 
-// GetSongsData ...
-func GetSongsData(usecase songDataGetter) http.Handler {
+func GetSongsData(repo songDataGetter) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		params, err := parseGetSongsDataQueryParams(r)
 		if err != nil {
 			slog.Info(err.Error())
-			w.Write([]byte(err.Error()))
+			httpkit.BadRequest(w, map[string]any{"error": err.Error()})
 			return
 		}
 
-		data, err := usecase.GetSongs(params)
+		data, err := repo.GetSongs(params)
 		if err != nil {
 			slog.Info(err.Error())
-			w.Write([]byte(err.Error()))
+			httpkit.InternalError(w)
 			return
 		}
 
-		response, _ := json.Marshal(data)
-		slog.Info("success", "status_code", http.StatusOK)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(response)
+		slog.Info("200")
+		httpkit.Ok(w, map[string]any{"songs": data})
 	})
 }
 
-// parseGetSongsDataQueryParams ...
 func parseGetSongsDataQueryParams(r *http.Request) (map[string]any, error) {
-	filterMap, err := parseFilterParams(r)
+	filterMap, err := parseGetSongsDataFilterParams(r)
 	if err != nil {
 		return nil, err
 	}
 
-	paginMap, err := parsePaginationParams(r)
+	limit, offset, err := parsePaginationParams(r)
 	if err != nil {
 		return nil, err
 	}
 
 	fields := httpkit.GetStrParam("fields", r)
-	return map[string]any{"filter": filterMap, "pagination": paginMap, "fields": fields}, nil
+	return map[string]any{
+		"filter": filterMap,
+		"limit":  limit,
+		"offset": offset,
+		"fields": fields,
+	}, nil
 }
 
-// parsePaginationParams ...
-func parsePaginationParams(r *http.Request) (map[string]int64, error) {
-	offset, err := httpkit.GetIntParam("offset", r)
-	if err != nil {
-		return nil, err
-	}
-
-	offset, err = checkOffsetParam(offset)
-	if err != nil {
-		return nil, err
-	}
-
-	limit, err := httpkit.GetIntParam("limit", r)
-	if err != nil {
-		return nil, err
-	}
-
-	limit, err = checkLimitParam(limit)
-	if err != nil {
-		return nil, err
-	}
-
-	return map[string]int64{"offset": offset, "limit": limit}, nil
-}
-
-func checkLimitParam(limit int64) (int64, error) {
-	if limit == 0 {
-		return 10, nil
-	}
-
-	if limit > 1000 {
-		return 1000, nil
-	}
-
-	if limit < 1 {
-		return 0, fmt.Errorf("limit=%d, but param must be >= 1", limit)
-	}
-
-	return limit, nil
-}
-
-func checkOffsetParam(offset int64) (int64, error) {
-	if offset < 0 {
-		return 0, fmt.Errorf("offset=%d, but param must be >= 0", offset)
-	}
-
-	return offset, nil
-}
-
-// parseFilterParams
-func parseFilterParams(r *http.Request) (map[string]any, error) {
+func parseGetSongsDataFilterParams(r *http.Request) (map[string]any, error) {
 	filter := httpkit.GetStrParam("filter", r)
 	if filter == "" {
 		return nil, nil

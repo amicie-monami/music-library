@@ -8,6 +8,7 @@ import (
 	"github.com/amicie-monami/music-library/config"
 	"github.com/amicie-monami/music-library/internal/repo"
 	"github.com/gorilla/mux"
+	"github.com/jmoiron/sqlx"
 )
 
 // server wraps the http.Server
@@ -15,8 +16,10 @@ type server struct {
 	srv *http.Server
 }
 
-func New(config *config.Config, songRepo *repo.Song) *server {
+func New(config *config.Config, db *sqlx.DB) *server {
 	router := mux.NewRouter()
+	songRepo := repo.NewSong(db)
+
 	configureRouter(router, songRepo)
 	srv := &http.Server{
 		Addr:           config.Server.Addr,
@@ -26,6 +29,7 @@ func New(config *config.Config, songRepo *repo.Song) *server {
 		MaxHeaderBytes: config.Server.MaxHeaderBytes,
 		Handler:        router,
 	}
+	
 	return &server{srv}
 }
 

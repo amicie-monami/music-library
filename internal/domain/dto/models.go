@@ -1,19 +1,14 @@
 package dto
 
-type UpdateSong struct {
+type Song struct {
 	Group string `json:"group,omitempty"`
-	Title string `json:"title,omitempty"`
+	Name  string `json:"song,omitempty"`
 }
 
 type SongDetails struct {
 	Text        *string `json:"text,omitempty"`
 	Link        *string `json:"link,omitempty"`
 	ReleaseDate *string `json:"release_date,omitempty"`
-}
-
-type UpdateSongRequest struct {
-	Song        *UpdateSong  `json:"song"`
-	SongDetails *SongDetails `json:"song_details"`
 }
 
 type SongWithDetails struct {

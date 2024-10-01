@@ -25,11 +25,11 @@ type conditionBuilderFunc func(string) (squirrel.Sqlizer, error)
 //   - squirrel.Sqlizer: A SQL condition builder object representing the combined "and" conditions
 //   - error: An error if there was an issue constructing any condition
 //   - nil if no conditions generated
-func buildParamBasedAndConditions(filter map[string]any, conditionResolvers map[string]conditionBuilderFunc) (squirrel.Sqlizer, error) {
+func buildParamBasedAndConditions(params map[string]any, conditionResolvers map[string]conditionBuilderFunc) (squirrel.Sqlizer, error) {
 	var conditions squirrel.And
 
 	for param, builderFunc := range conditionResolvers {
-		paramValue, ok := filter[param].(string)
+		paramValue, ok := params[param].(string)
 		if !ok || paramValue == "" {
 			continue
 		}
@@ -64,8 +64,9 @@ func buildParamBasedAndConditions(filter map[string]any, conditionResolvers map[
 //   - squirrel.Sqlizer: A SQL "OR" condition with each pattern applied using the "ILIKE" operator.
 //   - error: An error if the provided patterns string is empty.
 func buildILikeCondition(columnName string, patterns string) (squirrel.Sqlizer, error) {
+	fmt.Println(columnName, ".", patterns, ".")
 	if patterns == "" {
-		return nil, fmt.Errorf("invalid value of groups param")
+		return nil, fmt.Errorf("invalid value of %s param", columnName)
 	}
 
 	patterns = strings.ReplaceAll(patterns, "*", "%")

@@ -2,7 +2,7 @@
 CREATE TABLE songs (
     id BIGSERIAL PRIMARY KEY,
     group_name VARCHAR(32) NOT NULL,
-    song_title VARCHAR(32) NOT NULL
+    song_name VARCHAR(32) NOT NULL
 );
 
 -- Song details table
@@ -10,8 +10,8 @@ CREATE TABLE song_details (
     id BIGSERIAL PRIMARY KEY,
     song_id INT REFERENCES songs(id) ON DELETE CASCADE,
     release_date VARCHAR(16),
-    text VARCHAR(64),
-    link VARCHAR(64)
+    text text,
+    link varchar(256)
 );
 
 -- Trigger function

@@ -1,13 +1,15 @@
 package repo
 
 import (
+	"database/sql"
 	"fmt"
 	"log/slog"
 
 	"github.com/Masterminds/squirrel"
 	"github.com/amicie-monami/music-library/internal/domain/dto"
 	"github.com/amicie-monami/music-library/internal/domain/model"
-	"github.com/amicie-monami/music-library/pkg/reflect"
+	"github.com/amicie-monami/music-library/pkg/myreflect"
+
 	"github.com/jmoiron/sqlx"
 )
 
@@ -34,22 +36,22 @@ func (r *Song) GetSongText(id int64) (*string, error) {
 	return r.getSongTextById(id)
 }
 
-func (r *Song) GetSongDetails(group string, title string) (*model.SongDetail, error) {
+func (r *Song) GetSongWithDetails(group string, title string) (*dto.SongWithDetails, error) {
 	slog.Debug("get song", "group", group, "title", title)
-	return r.getSongDetails(group, title)
+	return r.getSongWithDetails(group, title)
 }
 
-func (r *Song) UpdateSong(song *model.Song) error {
+func (r *Song) UpdateSong(song *model.Song) (int64, error) {
 	slog.Debug("update song", "data", fmt.Sprintf("%+v", song))
 	return r.updateSong(song)
 }
 
-func (r *Song) UpdateSongDetails(details *model.SongDetail) error {
+func (r *Song) UpdateSongDetails(details *model.SongDetail) (int64, error) {
 	slog.Debug("update song details", "data", fmt.Sprintf("%+v", details))
 	return r.updateSongDetails(details)
 }
 
-func (r *Song) Delete(id int64) error {
+func (r *Song) Delete(id int64) (int64, error) {
 	slog.Debug("delete song", "id", id)
 	return r.deleteById(id)
 }
@@ -63,7 +65,7 @@ func (r *Song) create(song *model.Song) error {
 		Insert("songs").
 		Columns(
 			"group_name",
-			"song_title",
+			"song_name",
 		).
 		Values(song.Group, song.Name).
 		PlaceholderFormat(squirrel.Dollar).
@@ -75,25 +77,31 @@ func (r *Song) create(song *model.Song) error {
 
 func (r *Song) getSongs(aggregation map[string]any) ([]dto.SongWithDetails, error) {
 	columns := getSongsBuildColumnNames(aggregation["fields"].(string))
-	confitions, err := buildGetSongsWhereExpr(aggregation["filter"].(map[string]any))
+	constraints, err := buildGetSongsWhereExpr(aggregation["filter"].(map[string]any))
 	if err != nil {
 		return nil, err
 	}
 
-	query := squirrel.
+	queryBuilder := squirrel.
 		Select(columns...).
 		From("songs").
 		Join("song_details ON songs.id = song_details.song_id").
-		Where(confitions).
-		OrderBy("song_id")
-		// Limit(uint64(aggregation["limit"].(int64))).
-		// Offset(uint64(aggregation["offset"].(int64)))
+		Where(constraints).
+		OrderBy("song_id").
+		PlaceholderFormat(squirrel.Dollar)
 
-	sql, args := query.PlaceholderFormat(squirrel.Dollar).MustSql()
-	fmt.Println(sql)
+	if aggregation["limit"] != "" {
+		queryBuilder = queryBuilder.Limit(uint64(aggregation["limit"].(int64)))
+	}
+
+	if aggregation["offset"] != "" {
+		queryBuilder = queryBuilder.Offset(uint64(aggregation["offset"].(int64)))
+	}
+
+	query, args := queryBuilder.MustSql()
 
 	songs := make([]dto.SongWithDetails, 0)
-	return songs, r.db.Select(&songs, sql, args...)
+	return songs, r.db.Select(&songs, query, args...)
 }
 
 func (r *Song) getSongTextById(id int64) (*string, error) {
@@ -108,8 +116,10 @@ func (r *Song) getSongTextById(id int64) (*string, error) {
 	return songText, r.db.QueryRow(sql, args...).Scan(songText)
 }
 
-func (r *Song) getSongDetails(group string, title string) (*model.SongDetail, error) {
-	query := squirrel.
+func (r *Song) getSongWithDetails(group string, title string) (*dto.SongWithDetails, error) {
+	var songWithDetails dto.SongWithDetails
+
+	query, args := squirrel.
 		Select(
 			"song_id",
 			"release_date",
@@ -122,29 +132,36 @@ func (r *Song) getSongDetails(group string, title string) (*model.SongDetail, er
 			"songs.group_name": group,
 			"songs.song_name":  title,
 		}).
-		PlaceholderFormat(squirrel.Dollar)
+		PlaceholderFormat(squirrel.Dollar).
+		MustSql()
 
-	sql, args := query.MustSql()
-	details := new(model.SongDetail)
-	return details, r.db.Get(details, sql, args...)
+	err := r.db.Get(&songWithDetails, query, args...)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &songWithDetails, nil
 }
 
-func (r *Song) updateSong(song *model.Song) error {
+func (r *Song) updateSong(song *model.Song) (int64, error) {
 	if song == nil {
-		return nil
+		return 0, nil
 	}
-	fields := reflect.FillMapNotZeros(map[string]any{
+	fields := myreflect.FillMapNotZeros(map[string]any{
 		"group_name": song.Group,
 		"song_name":  song.Name,
 	})
 	return updateRow(r.db, "songs", "id", song.ID, fields)
 }
 
-func (r *Song) updateSongDetails(details *model.SongDetail) error {
+func (r *Song) updateSongDetails(details *model.SongDetail) (int64, error) {
 	if details == nil {
-		return nil
+		return 0, nil
 	}
-	fields := reflect.FillMapNotZeros(map[string]any{
+	fields := myreflect.FillMapNotZeros(map[string]any{
 		"text":         details.Text,
 		"link":         details.Link,
 		"release_date": details.ReleaseDate,
@@ -152,20 +169,24 @@ func (r *Song) updateSongDetails(details *model.SongDetail) error {
 	return updateRow(r.db, "song_details", "song_id", details.SongID, fields)
 }
 
-func (r *Song) deleteById(id int64) error {
-	query := squirrel.
+func (r *Song) deleteById(id int64) (int64, error) {
+	query, args := squirrel.
 		Delete("songs").
 		Where(squirrel.Eq{"id": id}).
-		PlaceholderFormat(squirrel.Dollar)
+		PlaceholderFormat(squirrel.Dollar).
+		MustSql()
 
-	sql, args := query.MustSql()
-	_, err := r.db.Exec(sql, args...)
-	return err
+	result, err := r.db.Exec(query, args...)
+	if err != nil {
+		return 0, err
+	}
+
+	return result.RowsAffected()
 }
 
-func updateRow(db *sqlx.DB, table, pk_column string, pk any, fields map[string]any) error {
+func updateRow(db *sqlx.DB, table, pk_column string, pk any, fields map[string]any) (int64, error) {
 	if len(fields) == 0 {
-		return nil
+		return 0, nil
 	}
 
 	query := squirrel.Update(table).
@@ -177,17 +198,8 @@ func updateRow(db *sqlx.DB, table, pk_column string, pk any, fields map[string]a
 
 	result, err := db.Exec(sql, args...)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if rowsAffected == 0 {
-		return fmt.Errorf("no rows were updated")
-	}
-
-	return nil
+	return result.RowsAffected()
 }

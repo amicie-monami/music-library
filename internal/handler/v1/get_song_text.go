@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -16,70 +14,69 @@ type songTextGetter interface {
 
 func GetSongText(repo songTextGetter) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		songId, err := httpkit.GetIntParam("id", r)
+		songID, songIDVar, err := parsePathVarSongID(r)
 		if err != nil {
-			slog.Info("failed to parse song id", "err", err)
-			w.Write([]byte(err.Error()))
+			slog.Info(err.Error())
+			httpkit.BadRequest(w, map[string]any{"error": "invalid song id", "song_id": songIDVar})
 			return
 		}
 
-		offset, err := httpkit.GetIntParam("offset", r)
+		limit, offset, err := parseGetSongTextQueryParams(r)
 		if err != nil {
-			slog.Info("failed to parse param 'offset'", "err", err)
-			w.Write([]byte(err.Error()))
+			slog.Info(err.Error())
+			httpkit.BadRequest(w, map[string]any{"error": err.Error()})
 			return
 		}
 
-		limit, err := httpkit.GetIntParam("limit", r)
+		songText, err := repo.GetSongText(songID)
 		if err != nil {
-			slog.Info("failed to parse param 'limit'", "err", err)
-			w.Write([]byte(err.Error()))
+			slog.Error(err.Error())
+			httpkit.InternalError(w)
 			return
 		}
 
-		songText, err := repo.GetSongText(songId)
+		couplets, err := coupletsPagination(songText, limit, offset)
 		if err != nil {
-			slog.Info("failed", "err", err)
-			w.Write([]byte(err.Error()))
+			httpkit.BadRequest(w, map[string]any{"error": err.Error()})
 			return
 		}
 
-		if songText == nil {
-			slog.Info("success", "err", err)
-			w.Write([]byte("no data about song text"))
-			return
-		}
-
-		couplets, err := textPagination(*songText, offset, limit)
-		if err != nil {
-			slog.Info("pagination failed", "err", err)
-			w.Write([]byte(err.Error()))
-			return
-		}
-
-		response, _ := json.Marshal(map[string]any{"couplets": couplets})
-		slog.Info("success", "status_code", http.StatusOK)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(response)
+		httpkit.Ok(w, map[string]any{"song_id": songID, "couplets": couplets})
+		slog.Info("200")
 	})
 }
 
-func textPagination(text string, offset int64, limit int64) ([]string, error) {
+func parseGetSongTextQueryParams(r *http.Request) (int64, int64, error) {
+	limit, err := httpkit.GetIntParam("limit", r)
+	if err != nil {
+		return 0, 0, err
+	}
+	offset, err := httpkit.GetIntParam("offset", r)
+	if err != nil {
+		return 0, 0, err
+	}
+	return limit, offset, nil
+}
+
+func coupletsPagination(text *string, limit int64, offset int64) ([]string, error) {
+	if text == nil {
+		return nil, nil
+	}
+
+	couplets := strings.Split(strings.ReplaceAll(*text, `\n`, "\n"), "\n\n")
+	if limit == 0 && offset == 0 {
+		return couplets, nil
+	}
+
 	if limit == 0 {
-		limit = 1
+		limit = 1000
 	}
 
-	couplets := strings.Split(text, "\n\n")
-	if couplets[len(couplets)-1] == "" {
-		couplets = couplets[:len(couplets)-1]
+	if int(offset) >= len(couplets) {
+		return nil, nil
 	}
 
-	lenVerses := len(couplets)
-	if lenVerses <= int(offset) {
-		return nil, fmt.Errorf("out of bounds")
-	}
-
-	if int(offset+limit) >= lenVerses {
+	if int(offset+limit) >= len(couplets) {
 		return couplets[offset:], nil
 	}
 

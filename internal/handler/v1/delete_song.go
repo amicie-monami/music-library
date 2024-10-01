@@ -3,40 +3,36 @@ package handler
 import (
 	"log/slog"
 	"net/http"
-	"strconv"
 
-	"github.com/gorilla/mux"
+	"github.com/amicie-monami/music-library/pkg/httpkit"
 )
 
 type SongDeletter interface {
-	Delete(id int64) error
+	Delete(id int64) (int64, error)
 }
 
-// DeleteSobg ...
 func DeleteSong(repo SongDeletter) http.Handler {
-
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-		songIdStr := mux.Vars(r)["id"]
-		songId, err := strconv.ParseInt(songIdStr, 0, 10)
+		songID, songIDVar, err := parsePathVarSongID(r)
 		if err != nil {
-			slog.Info("failed to parse song id", "value", songIdStr)
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(err.Error()))
+			slog.Info(err.Error())
+			httpkit.BadRequest(w, map[string]any{"error": "invalid song id", "song_id": songIDVar})
 			return
 		}
 
-		//add song to database
-		if err := repo.Delete(songId); err != nil {
-			slog.Info("failed to delete a song", "msg", err.Error())
-			// refactor -- checks error source, maybe it's http.ServerInternalError
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(err.Error()))
+		count, err := repo.Delete(songID)
+		if err != nil {
+			slog.Error(err.Error())
+			httpkit.InternalError(w)
 			return
 		}
 
-		//response
-		w.WriteHeader(http.StatusOK)
-		slog.Info("success", "status_code", http.StatusOK)
+		if count == 0 {
+			slog.Info("404 not found song id=" + songIDVar)
+			httpkit.BadRequest(w, map[string]any{"error": "song not found", "song_id": songID})
+			return
+		}
+
+		slog.Info("201")
 	})
 }
