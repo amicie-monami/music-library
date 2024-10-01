@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/amicie-monami/music-library/config"
-	"github.com/amicie-monami/music-library/internal/repo"
+	"github.com/amicie-monami/music-library/internal/repository"
 	"github.com/gorilla/mux"
 	"github.com/jmoiron/sqlx"
 )
@@ -18,7 +18,7 @@ type server struct {
 
 func New(config *config.Config, db *sqlx.DB) *server {
 	router := mux.NewRouter()
-	songRepo := repo.NewSong(db)
+	songRepo := repository.NewSong(db)
 
 	configureRouter(router, songRepo)
 	srv := &http.Server{
@@ -29,7 +29,7 @@ func New(config *config.Config, db *sqlx.DB) *server {
 		MaxHeaderBytes: config.Server.MaxHeaderBytes,
 		Handler:        router,
 	}
-	
+
 	return &server{srv}
 }
 

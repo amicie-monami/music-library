@@ -1,16 +1,56 @@
-package repo
+package repository
 
 import (
 	"fmt"
 	"strings"
 
 	"github.com/Masterminds/squirrel"
+	"github.com/jmoiron/sqlx"
 )
 
-// conditionBuilderFunc defines a function type that constructs SQL conditions.
-type conditionBuilderFunc func(string) (squirrel.Sqlizer, error)
+// updateRow Updates a row in the specified table.
+// It takes
+//   - db - database connection
+//   - table - table name,
+//   - pkEqConstraunt - a primary key equals constraint
+//   - setMap - a map of column values (setMap) to be updated.
+//
+// The function filters out zero-value entries (nil, 0, empty string) from setMap to avoid updating columns with "zero" values.
+// If no non-zero values are present in setMap, the function returns (0, nil) indicating no update was performed.
+//
+// Returns
+//   - the number of affected rows (int64)
+//   - an error if the query fails.
+func updateRow(db *sqlx.DB, table string, pkEqCostraint squirrel.Eq, setMap map[string]any) (int64, error) {
+	setMapWithoutZeros := make(map[string]any)
 
-// buildParamBasedAndConditions constructs a sql "and" condition based on the provided filter map and condition resolvers
+	for key, value := range setMap {
+		if value != nil && value != 0 && value != "" {
+			setMapWithoutZeros[key] = value
+		}
+	}
+
+	if len(setMapWithoutZeros) == 0 {
+		return 0, nil
+	}
+
+	query, args := squirrel.
+		Update(table).
+		SetMap(setMap).
+		Where(pkEqCostraint).
+		PlaceholderFormat(squirrel.Dollar).
+		MustSql()
+
+	result, err := db.Exec(query, args...)
+	if err != nil {
+		return 0, err
+	}
+
+	return result.RowsAffected()
+}
+
+// buildParamBasedAndConditions constructs a sql "and" condition [cond1 AND cond2 AND cond3...]
+// based on the provided filter map and condition resolvers
 //
 // This function iterates over the filter map, where each key is a parameter name, and the corresponding value is a string
 // representing the filter condition. For each key in the filter map, it finds a corresponding function in the
@@ -51,7 +91,8 @@ func buildParamBasedAndConditions(params map[string]any, conditionResolvers map[
 	return conditions, nil
 }
 
-// buildILikeCondition constructs an SQL "ILIKE" condition for the given columnName using the provided pattern(s).
+// buildILikeCondition constructs an SQL "ILIKE" condition [col ILIKE pattern1 OR col ILIKE pattern2...]
+// for the given columnName using the provided pattern(s).
 //
 // The function takes a column name and a string of patterns. If multiple patterns are provided, separated by spaces, the function
 // generates an "OR" condition, where each pattern is applied to the specified column using "ILIKE".
@@ -64,7 +105,6 @@ func buildParamBasedAndConditions(params map[string]any, conditionResolvers map[
 //   - squirrel.Sqlizer: A SQL "OR" condition with each pattern applied using the "ILIKE" operator.
 //   - error: An error if the provided patterns string is empty.
 func buildILikeCondition(columnName string, patterns string) (squirrel.Sqlizer, error) {
-	fmt.Println(columnName, ".", patterns, ".")
 	if patterns == "" {
 		return nil, fmt.Errorf("invalid value of %s param", columnName)
 	}
