@@ -9,3 +9,8 @@ type AddSongRequest struct {
 	Group string `json:"group"`
 	Song  string `json:"song"`
 }
+
+type GetSongDetailsRequest struct {
+	Group string `json:"group"`
+	Song  string `json:"song"`
+}

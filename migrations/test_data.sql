@@ -1,8 +1,7 @@
 DELETE FROM songs;
 DELETE FROM song_details;
 
-INSERT INTO songs (group_name, song_name)
-VALUES 
+INSERT INTO songs (group_name, song_name) VALUES 
 ('The Beatles', 'Hey Jude'),
 ('Queen', 'Bohemian Rhapsody'),
 ('Pink Floyd', 'Comfortably Numb'),
@@ -21,17 +20,17 @@ WITH random_services AS (
 UPDATE song_details SET
     release_date = (
         CASE song_id
-        WHEN 1  THEN '26-08-1968'
-        WHEN 2  THEN '31-10-1975'
-        WHEN 3  THEN '23-11-1979'
-        WHEN 4  THEN '08-11-1971'
-        WHEN 5  THEN '07-05-1966'
-        WHEN 6  THEN '14-04-1971'
-        WHEN 7  THEN '10-09-1991'
-        WHEN 8  THEN '30-07-1991'
-        WHEN 9  THEN '24-09-1990'
-        WHEN 10 THEN '21-1987-07'
-        ELSE 'Unknown' END
+        WHEN 1  THEN TO_DATE('26-08-1968', 'dd.mm.yyyy')
+        WHEN 2  THEN TO_DATE('31-10-1975', 'dd.mm.yyyy')
+        WHEN 3  THEN TO_DATE('23-11-1979', 'dd.mm.yyyy')
+        WHEN 4  THEN TO_DATE('08-11-1971', 'dd.mm.yyyy')
+        WHEN 5  THEN TO_DATE('07-05-1966', 'dd.mm.yyyy')
+        WHEN 6  THEN TO_DATE('14-04-1971', 'dd.mm.yyyy')
+        WHEN 7  THEN TO_DATE('10-09-1991', 'dd.mm.yyyy')
+        WHEN 8  THEN TO_DATE('30-07-1991', 'dd.mm.yyyy')
+        WHEN 9  THEN TO_DATE('24-09-1990', 'dd.mm.yyyy')
+        WHEN 10 THEN TO_DATE('21-07-1987', 'dd.mm.yyyy')
+        ELSE null END
     ),
     
     link = (

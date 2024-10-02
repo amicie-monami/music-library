@@ -9,8 +9,15 @@ import (
 
 	"github.com/amicie-monami/music-library/config"
 	"github.com/amicie-monami/music-library/internal/app"
+
+	_ "github.com/amicie-monami/music-library/docs" // Для загрузки сгенерированных файлов
 )
 
+// @title Music Library API
+// @version 1.0
+// @description API for managing songs in the music library.
+// @host localhost:8080
+// @BasePath /api/v1
 func main() {
 	slog.SetLogLoggerLevel(slog.LevelDebug)
 	flag.Parse()

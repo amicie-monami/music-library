@@ -1,20 +1,19 @@
--- Songs table
 CREATE TABLE songs (
     id BIGSERIAL PRIMARY KEY,
     group_name VARCHAR(32) NOT NULL,
     song_name VARCHAR(32) NOT NULL
 );
 
--- Song details table
 CREATE TABLE song_details (
     id BIGSERIAL PRIMARY KEY,
     song_id INT REFERENCES songs(id) ON DELETE CASCADE,
-    release_date VARCHAR(16),
+    release_date DATE,
     text text,
     link varchar(256)
 );
 
--- Trigger function
+-- add_song_details automatically adds a row with default values to 
+-- the song_details table after inserting a record into the songs table
 CREATE OR REPLACE FUNCTION add_song_detail()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -23,7 +22,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Trigger creating
+-- Creating a trigger to insert into the songs table
 CREATE TRIGGER after_insert_song
 AFTER INSERT ON songs
 FOR EACH ROW

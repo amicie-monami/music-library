@@ -15,6 +15,7 @@ import (
 )
 
 // Song object adapter for database operations with songs tables
+// (!!!) refactoring required. add context support
 type Song struct {
 	db *sqlx.DB
 }
@@ -25,8 +26,14 @@ func NewSong(db *sqlx.DB) *Song {
 
 /// ------------ Interface ------------ ///
 
+// Tx doesnt works, needs refactoring: e.g. Create a transactor object that can perform transactions
+// (in this repository it is only needed when using update operators collectively)
 func (r *Song) Tx(txActions func() error) error {
-	return txActions()
+	tx := r.db.MustBegin()
+	if err := txActions(); err != nil {
+		tx.Rollback()
+	}
+	return tx.Commit()
 }
 
 func (r *Song) Create(song *model.Song) error {
@@ -226,6 +233,19 @@ func buildSongIDCondition(paramSongID string) (squirrel.Sqlizer, error) {
 			return nil, fmt.Errorf("invalid comparison operator in sond_id param")
 		}
 		songID = songIDConstraint[1]
+
+	} else if len(songIDConstraint) > 2 {
+		and := squirrel.And{}
+		for idx := 0; idx < len(songIDConstraint); idx += 2 {
+			comparison = parseComparison(songIDConstraint[idx])
+			if comparison == "" {
+				return nil, fmt.Errorf("invalid comparison operator in sond_id param: %s, %v", songIDConstraint[idx], songIDConstraint)
+			}
+			songID = songIDConstraint[idx+1]
+			and = append(and, squirrel.Expr(fmt.Sprintf("song_id %s ?", comparison), songID))
+		}
+
+		return and, nil
 	}
 
 	//validation
@@ -250,6 +270,9 @@ func buildGroupsCondition(paramGroups string) (squirrel.Sqlizer, error) {
 		return nil, fmt.Errorf("invalid value of groups param")
 	}
 	groups := strings.Split(paramGroups, " ")
+	for idx := range groups {
+		groups[idx] = strings.ReplaceAll(groups[idx], "_", " ")
+	}
 	return squirrel.Eq{"group_name": groups}, nil
 }
 

@@ -1,0 +1,332 @@
+basePath: /api/v1
+definitions:
+  dto.AddSongRequest:
+    properties:
+      group:
+        type: string
+      song:
+        type: string
+    type: object
+  dto.Error:
+    properties:
+      details: {}
+      message:
+        type: string
+    type: object
+  dto.GetSongTextResponse:
+    properties:
+      couplets:
+        items:
+          type: string
+        type: array
+      song_id:
+        type: integer
+    type: object
+  dto.Song:
+    properties:
+      group:
+        type: string
+      song:
+        type: string
+    type: object
+  dto.SongDetails:
+    properties:
+      link:
+        type: string
+      release_date:
+        type: string
+      text:
+        type: string
+    type: object
+  dto.SongWithDetails:
+    properties:
+      group:
+        type: string
+      link:
+        type: string
+      release_date:
+        type: string
+      song:
+        type: string
+      song_id:
+        type: integer
+      text:
+        type: string
+    type: object
+  dto.UpdateSongRequest:
+    properties:
+      song:
+        $ref: '#/definitions/dto.Song'
+      song_details:
+        $ref: '#/definitions/dto.SongDetails'
+    type: object
+  model.Song:
+    properties:
+      group:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: API for managing songs in the music library.
+  title: Music Library API
+  version: "1.0"
+paths:
+  /info:
+    get:
+      description: Метод возвращает полную информацию о песне.
+      parameters:
+      - description: Название группы
+        in: query
+        name: group
+        required: true
+        type: string
+      - description: Название песни
+        in: query
+        name: song
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Объект, описывающий основную и дополнительную информацию о
+            песне.
+          schema:
+            $ref: '#/definitions/dto.SongWithDetails'
+        "400":
+          description: Неверный запрос, некорректные значения параметров.
+          schema:
+            $ref: '#/definitions/dto.Error'
+        "500":
+          description: Внутреняя ошибка сервера.
+          schema:
+            $ref: '#/definitions/dto.Error'
+      summary: Информация о песне
+      tags:
+      - Songs
+  /songs:
+    get:
+      consumes:
+      - application/json
+      description: Метод позволяет получить данные библиотеки, поддерживает пагинацию
+        и фильтрацию по всем полям.
+      parameters:
+      - description: Количество песен, которое необходимо верунть. Стандартное значение
+          10, предельное 1000.
+        in: query
+        name: limit
+        type: string
+      - description: Смещение, необходимое для выборки определенного подмножества
+          песен. Стандартное значение 0.
+        in: query
+        name: offset
+        type: string
+      - description: 'Список полей, которые необходимо вернуть. Допустимые значения:
+          [song_id, group, song, release_date, link, text]. Зачения передаются через
+          знак ”+”,например: fields=song_id+release_date.'
+        in: query
+        name: fields
+        type: string
+      - description: 'Фильтр, с помощью которого происходит аггрегация данных. Допустимые
+          значения: [song_id, song_name, groups, release_date, link, text]. Значения
+          передаются через знак ”,”, например: filter=song_id=1,groups=нервы+жщ. Описание
+          каждого параметра приведено ниже.'
+        in: query
+        name: filter
+        type: string
+      - description: 'Параметр описывает фильтр для идентификатора песни. Поддерживает
+          равенство на одно значение и выборку с помощью операторов сравнения: gt(>),
+          ge(>=), le(<=), lt(<). Пример: filter=song_id=gt+2+lt+8.'
+        in: query
+        name: (filter)song_id
+        type: string
+      - description: 'Параметр описывает фильтр для названия группы. Названия групп
+          передаются через знак ”+”.Чувствителен к регистру, пробелы в названиях заменяются
+          знаком ”_”. Пример: filter=groups=Noize_MC+мы.'
+        in: query
+        name: (filter)groups
+        type: string
+      - description: 'Параметр описывает фильтр для названий песен. Поддерживает оператор
+          * регулярных выражений, нечувствителен к регистру, множественные значения
+          передаются через знак ”+”. Пример: filter=song_name=Lil\*+\*eva\*.'
+        in: query
+        name: (filter)song_name
+        type: string
+      - description: 'Параметр описывает фильтр для даты релиза песни. Поддерживает
+          прямое равенство, операторы сравнения (см. (filter)song_id) и установку
+          границ с помощью знака ”-”. Пример: filter=release_date=01.01.2023-05.05.2024
+          (start_date-end_date).'
+        in: query
+        name: (filter)release_date
+        type: string
+      - description: 'Параметр описывает фильтр для ссылки на песню. Поддерживает
+          оператор * регулярных выражений, нечувствителен к регистру, множественные
+          значения передаются чреез знак ”+”. Пример: filter=link=\*yandex\*+\*spotify\*.'
+        in: query
+        name: (filter)link
+        type: string
+      - description: 'Параметр описывает фильтр для текста песни. Поддерживает оператор
+          * регулярных выражений, нечувствителен к регистру, множественные значения
+          передаются чреез знак ”+”. Пример: filter=text=\*батюшка\*+\*ленин\*.'
+        in: query
+        name: (filter)text
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Список песен, прошедших аггрегацию данных.
+          schema:
+            items:
+              items:
+                $ref: '#/definitions/dto.SongWithDetails'
+              type: array
+            type: array
+        "400":
+          description: Неверный запрос, некорректные значения параметров.
+          schema:
+            $ref: '#/definitions/dto.Error'
+        "500":
+          description: Внутреняя ошибка сервера.
+          schema:
+            $ref: '#/definitions/dto.Error'
+      summary: Получение данных библиотеки
+      tags:
+      - Songs
+    post:
+      consumes:
+      - application/json
+      description: Метод добавляет в библиотеку основную информацию о песне.
+      parameters:
+      - description: Параметры песни, информацию о которой необходимо добавить в библиотеку.
+        in: body
+        name: group
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AddSongRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Объект, описывающий добавленную песню.
+          schema:
+            $ref: '#/definitions/model.Song'
+        "400":
+          description: Неверный запрос, некорректные значения параметров.
+          schema:
+            $ref: '#/definitions/dto.Error'
+        "500":
+          description: Внутреняя ошибка сервера.
+          schema:
+            $ref: '#/definitions/dto.Error'
+      summary: Добавление новой песни
+      tags:
+      - Songs
+  /songs/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Метод удаляет всю информацию о песне по переданному идектификатору.
+      parameters:
+      - description: Идентификатор песни, информацию о которой необходимо удалить.
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Информация успешно удалена, нет данных в теле ответа.
+          schema:
+            type: string
+        "404":
+          description: Неккоректные значения параметров запроса.
+          schema:
+            $ref: '#/definitions/dto.Error'
+        "500":
+          description: Внутреняя ошибка сервера.
+          schema:
+            $ref: '#/definitions/dto.Error'
+      summary: Удаление песни
+      tags:
+      - Songs
+    patch:
+      consumes:
+      - application/json
+      description: Метод позволяет изменить данные песни, хранящиеся в библиотеке.
+      parameters:
+      - description: Идентификатор песни, данные которой необходимо изменить.
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Данные песни, которые необходимо изменить.
+        in: body
+        name: songInfo
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateSongRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Данные были успешно обновлены, нет возвращаемого значения.
+          schema:
+            type: string
+        "400":
+          description: Неверный запрос, некорректные значения параметров.
+          schema:
+            $ref: '#/definitions/dto.Error'
+        "500":
+          description: Внутреняя ошибка сервера.
+          schema:
+            $ref: '#/definitions/dto.Error'
+      summary: Изменение данных песни
+      tags:
+      - Songs
+  /songs/{id}/lyrics:
+    get:
+      consumes:
+      - application/json
+      description: Метод возвращает текст песни в куплетах. Если не заданы параметры
+        пагинации, возвращаются все куплеты.
+      parameters:
+      - description: Идентификатор песни, текст которой необходимо получить.
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Количество куплетов, которое необходимо верунть.
+        in: query
+        name: limit
+        type: string
+      - description: Смещение, необходимое для выборки определенного подмножества
+          куплетов.
+        in: query
+        name: offset
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Текст песни
+          schema:
+            $ref: '#/definitions/dto.GetSongTextResponse'
+        "400":
+          description: Неверный запрос, некорректые значения параметров.
+          schema:
+            $ref: '#/definitions/dto.Error'
+        "500":
+          description: Внутреняя ошибка сервера.
+          schema:
+            $ref: '#/definitions/dto.Error'
+      summary: Получение текста песни с пагинацией по куплетам
+      tags:
+      - Songs
+swagger: "2.0"

@@ -2,12 +2,14 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/amicie-monami/music-library/internal/domain/dto"
 	"github.com/amicie-monami/music-library/internal/domain/model"
-	"github.com/amicie-monami/music-library/pkg/httpkit"
+	"github.com/pawpawchat/core/pkg/response"
 )
 
 type songDataUpdater interface {
@@ -16,48 +18,75 @@ type songDataUpdater interface {
 	UpdateSongDetails(details *model.SongDetail) (count int64, err error)
 }
 
+// @Summary Изменение данных песни
+// @Description Метод позволяет изменить данные песни, хранящиеся в библиотеке.
+// @Router /songs/{id} [patch]
+// @Tags Songs
+// @Accept json
+// @Produce json
+// @Param id path int true "Идентификатор песни, данные которой необходимо изменить."
+// @Param songInfo body dto.UpdateSongRequest true "Данные песни, которые необходимо изменить."
+// @Success 200 {string} string "Данные были успешно обновлены, нет возвращаемого значения."
+// @Failure 400 {object} dto.Error "Неверный запрос, некорректные значения параметров."
+// @Failure 500 {object} dto.Error "Внутреняя ошибка сервера."
 func UpdateSong(repo songDataUpdater) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		songID, songIDVar, err := parsePathVarSongID(r)
 		if err != nil {
 			slog.Info(err.Error())
-			httpkit.BadRequest(w, map[string]any{"error": "invalid song id", "song_id": songIDVar})
+			response.Json().BadRequest().Body(body{"error": "invalid song id", "song_id": songIDVar}).MustWrite(w)
 			return
 		}
 
 		//parse body
 		song, songDetails, err := parseUpdateSongBody(songID, r)
 		if err != nil {
-			slog.Info("404" + err.Error())
-			httpkit.BadRequest(w, map[string]any{"error": err.Error()})
+			slog.Info(err.Error())
+			response.Json().BadRequest().Body(body{"error": err.Error()}).MustWrite(w)
 			return
 		}
 
-		//refactor: wrap in transaction
-		//sql query for song
-		count, err := repo.UpdateSong(song)
-		if err != nil {
-			slog.Error("404 failed to update a song data", "msg", err.Error())
-			httpkit.InternalError(w)
-			return
-		} else if count == 0 {
-			slog.Info("404 song not found", "song_id", songID)
-			httpkit.BadRequest(w, map[string]any{"error": "song not found", "song_id": songID})
+		// this shit needs a lot of refactoring...
+		// First of all it needs to move the transaction logic to a separate object
+		tx := func() error {
+			if song != nil {
+				count, err := repo.UpdateSong(song)
+				if err != nil {
+					slog.Error("failed to update a song data", "msg", err.Error())
+					// needs refactoring: to get rid of the "magic" error
+					response.Json().InternalError().Body(dto.Error{Message: "Internal server error"})
+					return err
+
+				} else if count == 0 {
+					slog.Info("song not found", "song_id", songID)
+					response.Json().BadRequest().Body(body{"error": "song not found", "song_id": songID}).MustWrite(w)
+					return err
+				}
+			}
+
+			//sql query for song details
+			if songDetails != nil {
+				count, err := repo.UpdateSongDetails(songDetails)
+				if err != nil {
+					slog.Info("failed to update a song details", "msg", err.Error())
+					// needs refactoring: to get rid of the "magic" error
+					response.Json().InternalError().Body(dto.Error{Message: "Internal server error"})
+					return err
+
+				} else if count == 0 {
+					slog.Info("song details not found", "song_id", songID)
+					response.Json().BadRequest().Body(body{"error": "song details not found", "song_id": songID}).MustWrite(w)
+					return err
+				}
+			}
+			return nil
+		}
+
+		if err := repo.Tx(tx); err != nil {
 			return
 		}
 
-		//sql query for song details
-		count, err = repo.UpdateSongDetails(songDetails)
-		if err != nil {
-			slog.Info("500 failed to update a song details", "msg", err.Error())
-			httpkit.InternalError(w)
-			return
-		} else if count == 0 {
-			slog.Info("404 song details not found", "song_id", songID)
-			httpkit.BadRequest(w, map[string]any{"error": "song not found", "song_id": songID})
-			return
-		}
-
+		response.Json().OK().MustWrite(w)
 		slog.Info("200")
 	})
 }
@@ -83,11 +112,18 @@ func parseUpdateSongBody(songID int64, r *http.Request) (*model.Song, *model.Son
 
 	if body.SongDetails != nil {
 		songDetails = &model.SongDetail{
-			SongID:      songID,
-			ReleaseDate: body.SongDetails.ReleaseDate,
-			Text:        body.SongDetails.Text,
-			Link:        body.SongDetails.Link,
+			SongID: songID,
+			Text:   body.SongDetails.Text,
+			Link:   body.SongDetails.Link,
 		}
+	}
+
+	if body.SongDetails.ReleaseDate != "" {
+		releaseDate, err := time.Parse("01.01.2006", body.SongDetails.ReleaseDate)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to parae release_date field")
+		}
+		songDetails.ReleaseDate = &releaseDate
 	}
 
 	return song, songDetails, nil

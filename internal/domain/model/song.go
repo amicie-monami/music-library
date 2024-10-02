@@ -1,5 +1,7 @@
 package model
 
+import "time"
+
 type Song struct {
 	ID    int64
 	Name  string
@@ -9,7 +11,7 @@ type Song struct {
 type SongDetail struct {
 	ID          int64
 	SongID      int64
-	ReleaseDate *string
+	ReleaseDate *time.Time
 	Text        *string
 	Link        *string
 }

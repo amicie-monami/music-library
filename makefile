@@ -33,7 +33,7 @@ get_song_details:
 	curl -X GET "${BASE_URL}/info${query}" | jq
 
 update_song:
-	curl -X PATCH "${BASE_URL}/songs/${id}" -H "Content-Type: application/json" '${data}' | jq
+	curl -X PATCH "${BASE_URL}/songs/${id}" -H "Content-Type: application/json" --data '${data}'
 
 
 check_db:

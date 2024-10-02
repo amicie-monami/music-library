@@ -1,0 +1,468 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "API for managing songs in the music library.",
+        "title": "Music Library API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/api/v1",
+    "paths": {
+        "/info": {
+            "get": {
+                "description": "Метод возвращает полную информацию о песне.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Songs"
+                ],
+                "summary": "Информация о песне",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Название группы",
+                        "name": "group",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Название песни",
+                        "name": "song",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Объект, описывающий основную и дополнительную информацию о песне.",
+                        "schema": {
+                            "$ref": "#/definitions/dto.SongWithDetails"
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный запрос, некорректные значения параметров.",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутреняя ошибка сервера.",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/songs": {
+            "get": {
+                "description": "Метод позволяет получить данные библиотеки, поддерживает пагинацию и фильтрацию по всем полям.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Songs"
+                ],
+                "summary": "Получение данных библиотеки",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Количество песен, которое необходимо верунть. Стандартное значение 10, предельное 1000.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Смещение, необходимое для выборки определенного подмножества песен. Стандартное значение 0.",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Список полей, которые необходимо вернуть. Допустимые значения: [song_id, group, song, release_date, link, text]. Зачения передаются через знак ”+”,например: fields=song_id+release_date.",
+                        "name": "fields",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Фильтр, с помощью которого происходит аггрегация данных. Допустимые значения: [song_id, song_name, groups, release_date, link, text]. Значения передаются через знак ”,”, например: filter=song_id=1,groups=нервы+жщ. Описание каждого параметра приведено ниже.",
+                        "name": "filter",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Параметр описывает фильтр для идентификатора песни. Поддерживает равенство на одно значение и выборку с помощью операторов сравнения: gt(\u003e), ge(\u003e=), le(\u003c=), lt(\u003c). Пример: filter=song_id=gt+2+lt+8.",
+                        "name": "(filter)song_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Параметр описывает фильтр для названия группы. Названия групп передаются через знак ”+”.Чувствителен к регистру, пробелы в названиях заменяются знаком ”_”. Пример: filter=groups=Noize_MC+мы.",
+                        "name": "(filter)groups",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Параметр описывает фильтр для названий песен. Поддерживает оператор * регулярных выражений, нечувствителен к регистру, множественные значения передаются через знак ”+”. Пример: filter=song_name=Lil\\*+\\*eva\\*.",
+                        "name": "(filter)song_name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Параметр описывает фильтр для даты релиза песни. Поддерживает прямое равенство, операторы сравнения (см. (filter)song_id) и установку границ с помощью знака ”-”. Пример: filter=release_date=01.01.2023-05.05.2024 (start_date-end_date).",
+                        "name": "(filter)release_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Параметр описывает фильтр для ссылки на песню. Поддерживает оператор * регулярных выражений, нечувствителен к регистру, множественные значения передаются чреез знак ”+”. Пример: filter=link=\\*yandex\\*+\\*spotify\\*.",
+                        "name": "(filter)link",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Параметр описывает фильтр для текста песни. Поддерживает оператор * регулярных выражений, нечувствителен к регистру, множественные значения передаются чреез знак ”+”. Пример: filter=text=\\*батюшка\\*+\\*ленин\\*.",
+                        "name": "(filter)text",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Список песен, прошедших аггрегацию данных.",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/definitions/dto.SongWithDetails"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный запрос, некорректные значения параметров.",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутреняя ошибка сервера.",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Error"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Метод добавляет в библиотеку основную информацию о песне.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Songs"
+                ],
+                "summary": "Добавление новой песни",
+                "parameters": [
+                    {
+                        "description": "Параметры песни, информацию о которой необходимо добавить в библиотеку.",
+                        "name": "group",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.AddSongRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Объект, описывающий добавленную песню.",
+                        "schema": {
+                            "$ref": "#/definitions/model.Song"
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный запрос, некорректные значения параметров.",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутреняя ошибка сервера.",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/songs/{id}": {
+            "delete": {
+                "description": "Метод удаляет всю информацию о песне по переданному идектификатору.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Songs"
+                ],
+                "summary": "Удаление песни",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Идентификатор песни, информацию о которой необходимо удалить.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Информация успешно удалена, нет данных в теле ответа.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Неккоректные значения параметров запроса.",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутреняя ошибка сервера.",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Error"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "description": "Метод позволяет изменить данные песни, хранящиеся в библиотеке.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Songs"
+                ],
+                "summary": "Изменение данных песни",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Идентификатор песни, данные которой необходимо изменить.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Данные песни, которые необходимо изменить.",
+                        "name": "songInfo",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateSongRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Данные были успешно обновлены, нет возвращаемого значения.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный запрос, некорректные значения параметров.",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутреняя ошибка сервера.",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/songs/{id}/lyrics": {
+            "get": {
+                "description": "Метод возвращает текст песни в куплетах. Если не заданы параметры пагинации, возвращаются все куплеты.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Songs"
+                ],
+                "summary": "Получение текста песни с пагинацией по куплетам",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Идентификатор песни, текст которой необходимо получить.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Количество куплетов, которое необходимо верунть.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Смещение, необходимое для выборки определенного подмножества куплетов.",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Текст песни",
+                        "schema": {
+                            "$ref": "#/definitions/dto.GetSongTextResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный запрос, некорректые значения параметров.",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутреняя ошибка сервера.",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Error"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "dto.AddSongRequest": {
+            "type": "object",
+            "properties": {
+                "group": {
+                    "type": "string"
+                },
+                "song": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.Error": {
+            "type": "object",
+            "properties": {
+                "details": {},
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.GetSongTextResponse": {
+            "type": "object",
+            "properties": {
+                "couplets": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "song_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.Song": {
+            "type": "object",
+            "properties": {
+                "group": {
+                    "type": "string"
+                },
+                "song": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.SongDetails": {
+            "type": "object",
+            "properties": {
+                "link": {
+                    "type": "string"
+                },
+                "release_date": {
+                    "type": "string"
+                },
+                "text": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.SongWithDetails": {
+            "type": "object",
+            "properties": {
+                "group": {
+                    "type": "string"
+                },
+                "link": {
+                    "type": "string"
+                },
+                "release_date": {
+                    "type": "string"
+                },
+                "song": {
+                    "type": "string"
+                },
+                "song_id": {
+                    "type": "integer"
+                },
+                "text": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.UpdateSongRequest": {
+            "type": "object",
+            "properties": {
+                "song": {
+                    "$ref": "#/definitions/dto.Song"
+                },
+                "song_details": {
+                    "$ref": "#/definitions/dto.SongDetails"
+                }
+            }
+        },
+        "model.Song": {
+            "type": "object",
+            "properties": {
+                "group": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}
