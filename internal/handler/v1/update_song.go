@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -13,9 +14,9 @@ import (
 )
 
 type songDataUpdater interface {
-	Tx(txActions func() error) error
-	UpdateSong(song *model.Song) (count int64, err error)
-	UpdateSongDetails(details *model.SongDetail) (count int64, err error)
+	Tx(ctx context.Context, txActions func() error) error
+	UpdateSong(ctx context.Context, song *model.Song) (count int64, err error)
+	UpdateSongDetails(ctx context.Context, details *model.SongDetail) (count int64, err error)
 }
 
 // @Summary Изменение данных песни
@@ -46,15 +47,14 @@ func UpdateSong(repo songDataUpdater) http.Handler {
 			return
 		}
 
-		// this shit needs a lot of refactoring...
-		// First of all it needs to move the transaction logic to a separate object
+		//transaction actions
 		tx := func() error {
 			if song != nil {
-				count, err := repo.UpdateSong(song)
+				count, err := repo.UpdateSong(r.Context(), song)
 				if err != nil {
 					slog.Error("failed to update a song data", "msg", err.Error())
 					// needs refactoring: to get rid of the "magic" error
-					response.Json().InternalError().Body(dto.Error{Message: "Internal server error"})
+					response.Json().InternalError().Body(dto.Error{Message: "Internal server error"}).MustWrite(w)
 					return err
 
 				} else if count == 0 {
@@ -66,11 +66,11 @@ func UpdateSong(repo songDataUpdater) http.Handler {
 
 			//sql query for song details
 			if songDetails != nil {
-				count, err := repo.UpdateSongDetails(songDetails)
+				count, err := repo.UpdateSongDetails(r.Context(), songDetails)
 				if err != nil {
 					slog.Info("failed to update a song details", "msg", err.Error())
 					// needs refactoring: to get rid of the "magic" error
-					response.Json().InternalError().Body(dto.Error{Message: "Internal server error"})
+					response.Json().InternalError().Body(dto.Error{Message: "Internal server error"}).MustWrite(w)
 					return err
 
 				} else if count == 0 {
@@ -82,7 +82,7 @@ func UpdateSong(repo songDataUpdater) http.Handler {
 			return nil
 		}
 
-		if err := repo.Tx(tx); err != nil {
+		if err := repo.Tx(r.Context(), tx); err != nil {
 			return
 		}
 
@@ -121,7 +121,7 @@ func parseUpdateSongBody(songID int64, r *http.Request) (*model.Song, *model.Son
 	if body.SongDetails.ReleaseDate != "" {
 		releaseDate, err := time.Parse("01.01.2006", body.SongDetails.ReleaseDate)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to parae release_date field")
+			return nil, nil, fmt.Errorf("failed to parse release_date field")
 		}
 		songDetails.ReleaseDate = &releaseDate
 	}

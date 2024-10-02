@@ -10,7 +10,7 @@ import (
 	"github.com/amicie-monami/music-library/config"
 	"github.com/amicie-monami/music-library/internal/app"
 
-	_ "github.com/amicie-monami/music-library/docs" // Для загрузки сгенерированных файлов
+	_ "github.com/amicie-monami/music-library/docs"
 )
 
 // @title Music Library API

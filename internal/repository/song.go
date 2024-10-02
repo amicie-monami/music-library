@@ -1,9 +1,11 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -14,29 +16,65 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// Song object adapter for database operations with songs tables
-// (!!!) refactoring required. add context support
-type Song struct {
-	db *sqlx.DB
+// dbContext describes the database context.
+// Can take the values sqlx.DB or sqlx.TX
+type dbContext interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error
+	SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
-func NewSong(db *sqlx.DB) *Song {
+// Song object adapter for database operations with songs tables
+type Song struct {
+	db dbContext
+}
+
+func NewSong(db dbContext) *Song {
 	return &Song{db}
 }
 
 /// ------------ Interface ------------ ///
 
-// Tx doesnt works, needs refactoring: e.g. Create a transactor object that can perform transactions
-// (in this repository it is only needed when using update operators collectively)
-func (r *Song) Tx(txActions func() error) error {
-	tx := r.db.MustBegin()
-	if err := txActions(); err != nil {
-		tx.Rollback()
+// Tx execute the transaction, the action of which described in the txActions
+func (r *Song) Tx(ctx context.Context, txActions func() error) error {
+	db, ok := r.db.(*sqlx.DB)
+	if !ok {
+		return fmt.Errorf("unsupport database type: %v", reflect.TypeOf(r.db))
 	}
-	return tx.Commit()
+
+	tx, err := db.BeginTxx(ctx, &sql.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to begin the transaction: %s", err)
+	}
+
+	//change the context of the repository database to a transaction
+	r.db = tx
+	defer func() {
+		//after transactions are executed, return the database context to the instance
+		r.db = db
+		if p := recover(); p != nil {
+			tx.Rollback()
+			panic(p)
+		} else if err != nil {
+			tx.Rollback()
+		}
+	}()
+
+	//make a payload
+	if err = txActions(); err != nil {
+		return err
+	}
+
+	//commits the changes
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (r *Song) Create(song *model.Song) error {
+func (r *Song) Create(ctx context.Context, song *model.Song) error {
 	slog.Debug("create song", "data", fmt.Sprintf("%+v", song))
 
 	query := squirrel.
@@ -50,10 +88,10 @@ func (r *Song) Create(song *model.Song) error {
 		Suffix("RETURNING id")
 
 	sql, args := query.MustSql()
-	return r.db.QueryRow(sql, args...).Scan(&song.ID)
+	return r.db.QueryRowContext(ctx, sql, args...).Scan(&song.ID)
 }
 
-func (r *Song) GetSongs(aggregation map[string]any) ([]dto.SongWithDetails, error) {
+func (r *Song) GetSongs(ctx context.Context, aggregation map[string]any) ([]dto.SongWithDetails, error) {
 	slog.Debug("get song", "aggregation data=", aggregation)
 
 	columns := buildGetSongsColumnNames(aggregation["fields"].(string))
@@ -83,10 +121,10 @@ func (r *Song) GetSongs(aggregation map[string]any) ([]dto.SongWithDetails, erro
 	query, args := queryBuilder.MustSql()
 
 	songs := make([]dto.SongWithDetails, 0)
-	return songs, r.db.Select(&songs, query, args...)
+	return songs, r.db.SelectContext(ctx, &songs, query, args...)
 }
 
-func (r *Song) GetSongText(id int64) (*string, error) {
+func (r *Song) GetSongText(ctx context.Context, id int64) (*string, error) {
 	slog.Debug("get song text", "id", id)
 
 	query, args := squirrel.
@@ -97,10 +135,10 @@ func (r *Song) GetSongText(id int64) (*string, error) {
 		MustSql()
 
 	songText := new(string)
-	return songText, r.db.QueryRow(query, args...).Scan(songText)
+	return songText, r.db.QueryRowContext(ctx, query, args...).Scan(songText)
 }
 
-func (r *Song) GetSongWithDetails(group string, title string) (*dto.SongWithDetails, error) {
+func (r *Song) GetSongWithDetails(ctx context.Context, group string, title string) (*dto.SongWithDetails, error) {
 	slog.Debug("get song", "group", group, "title", title)
 	var songWithDetails dto.SongWithDetails
 
@@ -120,7 +158,7 @@ func (r *Song) GetSongWithDetails(group string, title string) (*dto.SongWithDeta
 		PlaceholderFormat(squirrel.Dollar).
 		MustSql()
 
-	err := r.db.Get(&songWithDetails, query, args...)
+	err := r.db.GetContext(ctx, &songWithDetails, query, args...)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -131,7 +169,7 @@ func (r *Song) GetSongWithDetails(group string, title string) (*dto.SongWithDeta
 	return &songWithDetails, nil
 }
 
-func (r *Song) UpdateSong(song *model.Song) (int64, error) {
+func (r *Song) UpdateSong(ctx context.Context, song *model.Song) (int64, error) {
 	slog.Debug("update song", "data", fmt.Sprintf("%+v", song))
 	if song == nil {
 		return 0, nil
@@ -145,10 +183,10 @@ func (r *Song) UpdateSong(song *model.Song) (int64, error) {
 		"song_name":  song.Name,
 	}
 
-	return updateRow(r.db, table, primaryKeyEqauls, setMap)
+	return updateRowContext(ctx, r.db, table, primaryKeyEqauls, setMap)
 }
 
-func (r *Song) UpdateSongDetails(details *model.SongDetail) (int64, error) {
+func (r *Song) UpdateSongDetails(ctx context.Context, details *model.SongDetail) (int64, error) {
 	slog.Debug("update song details", "data", fmt.Sprintf("%+v", details))
 
 	table := "song_details"
@@ -160,10 +198,10 @@ func (r *Song) UpdateSongDetails(details *model.SongDetail) (int64, error) {
 		"release_date": details.ReleaseDate,
 	}
 
-	return updateRow(r.db, table, primaryKeyEqauls, setMap)
+	return updateRowContext(ctx, r.db, table, primaryKeyEqauls, setMap)
 }
 
-func (r *Song) Delete(id int64) (int64, error) {
+func (r *Song) Delete(ctx context.Context, id int64) (int64, error) {
 	slog.Debug("delete song", "id", id)
 
 	query, args := squirrel.
@@ -172,7 +210,7 @@ func (r *Song) Delete(id int64) (int64, error) {
 		PlaceholderFormat(squirrel.Dollar).
 		MustSql()
 
-	result, err := r.db.Exec(query, args...)
+	result, err := r.db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return 0, err
 	}

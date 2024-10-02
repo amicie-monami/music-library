@@ -1,11 +1,11 @@
 package repository
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/Masterminds/squirrel"
-	"github.com/jmoiron/sqlx"
 )
 
 // updateRow Updates a row in the specified table.
@@ -21,7 +21,7 @@ import (
 // Returns
 //   - the number of affected rows (int64)
 //   - an error if the query fails.
-func updateRow(db *sqlx.DB, table string, pkEqCostraint squirrel.Eq, setMap map[string]any) (int64, error) {
+func updateRowContext(ctx context.Context, db dbContext, table string, pkEqCostraint squirrel.Eq, setMap map[string]any) (int64, error) {
 	setMapWithoutZeros := make(map[string]any)
 
 	for key, value := range setMap {
@@ -41,7 +41,7 @@ func updateRow(db *sqlx.DB, table string, pkEqCostraint squirrel.Eq, setMap map[
 		PlaceholderFormat(squirrel.Dollar).
 		MustSql()
 
-	result, err := db.Exec(query, args...)
+	result, err := db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return 0, err
 	}

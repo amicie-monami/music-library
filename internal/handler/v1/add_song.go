@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -14,7 +15,7 @@ import (
 type body map[string]any
 
 type SongAdder interface {
-	Create(song *model.Song) error
+	Create(ctx context.Context, song *model.Song) error
 }
 
 // @Summary Добавление новой песни
@@ -36,7 +37,7 @@ func AddSong(repo SongAdder) http.Handler {
 			return
 		}
 
-		if err := repo.Create(song); err != nil {
+		if err := repo.Create(r.Context(), song); err != nil {
 			slog.Error(err.Error())
 			// needs refactoring: to get rid of the "magic" error
 			response.Json().InternalError().Body(body{"error": "internal server error"}).MustWrite(w)

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 
@@ -8,7 +9,7 @@ import (
 )
 
 type SongDeletter interface {
-	Delete(id int64) (int64, error)
+	Delete(ctx context.Context, id int64) (int64, error)
 }
 
 // @Summary Удаление песни
@@ -30,7 +31,7 @@ func DeleteSong(repo SongDeletter) http.Handler {
 			return
 		}
 
-		count, err := repo.Delete(songID)
+		count, err := repo.Delete(r.Context(), songID)
 		if err != nil {
 			slog.Error(err.Error())
 			// needs refactoring: to get rid of the "magic" error

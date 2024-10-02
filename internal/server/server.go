@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"time"
 
@@ -16,7 +17,7 @@ type server struct {
 	srv *http.Server
 }
 
-func New(config *config.Config, db *sqlx.DB) *server {
+func New(ctx context.Context, config *config.Config, db *sqlx.DB) *server {
 	router := mux.NewRouter()
 	songRepo := repository.NewSong(db)
 
@@ -28,6 +29,7 @@ func New(config *config.Config, db *sqlx.DB) *server {
 		IdleTimeout:    time.Duration(config.Server.IdleTimeout) * time.Second,
 		MaxHeaderBytes: config.Server.MaxHeaderBytes,
 		Handler:        router,
+		BaseContext:    func(l net.Listener) context.Context { return ctx },
 	}
 
 	return &server{srv}

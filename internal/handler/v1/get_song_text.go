@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log/slog"
@@ -13,7 +14,7 @@ import (
 )
 
 type songTextGetter interface {
-	GetSongText(id int64) (*string, error)
+	GetSongText(ctx context.Context, id int64) (*string, error)
 }
 
 // @Summary Получение текста песни с пагинацией по куплетам
@@ -44,7 +45,7 @@ func GetSongText(repo songTextGetter) http.Handler {
 			return
 		}
 
-		songText, err := repo.GetSongText(songID)
+		songText, err := repo.GetSongText(r.Context(), songID)
 		if err != nil {
 
 			if err == sql.ErrNoRows {

@@ -23,7 +23,7 @@ func Run(ctx context.Context, config *config.Config) {
 
 	runMigrations(db.DB)
 
-	server := server.New(config, db)
+	server := server.New(ctx, config, db)
 	var wg sync.WaitGroup
 	wg.Add(1)
 

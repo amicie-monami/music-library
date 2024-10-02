@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 
@@ -10,7 +11,7 @@ import (
 )
 
 type songDetailsGetter interface {
-	GetSongWithDetails(group string, title string) (*dto.SongWithDetails, error)
+	GetSongWithDetails(ctx context.Context, group string, title string) (*dto.SongWithDetails, error)
 }
 
 // @Summary Информация о песне
@@ -32,7 +33,7 @@ func GetSongDetails(repo songDetailsGetter) http.Handler {
 			return
 		}
 
-		songWithDetails, err := repo.GetSongWithDetails(params["song"], params["title"])
+		songWithDetails, err := repo.GetSongWithDetails(r.Context(), params["song"], params["title"])
 		if err != nil {
 			slog.Error(err.Error())
 			// needs refactoring: to get rid of the "magic" error
