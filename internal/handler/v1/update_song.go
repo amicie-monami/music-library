@@ -116,14 +116,13 @@ func parseUpdateSongBody(songID int64, r *http.Request) (*model.Song, *model.Son
 			Text:   body.SongDetails.Text,
 			Link:   body.SongDetails.Link,
 		}
-	}
-
-	if body.SongDetails.ReleaseDate != "" {
-		releaseDate, err := time.Parse("01.01.2006", body.SongDetails.ReleaseDate)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to parse release_date field")
+		if body.SongDetails.ReleaseDate != "" {
+			releaseDate, err := time.Parse("01.01.2006", body.SongDetails.ReleaseDate)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to parse release_date field")
+			}
+			songDetails.ReleaseDate = &releaseDate
 		}
-		songDetails.ReleaseDate = &releaseDate
 	}
 
 	return song, songDetails, nil
