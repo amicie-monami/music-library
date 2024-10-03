@@ -2,14 +2,18 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 
-	"github.com/pawpawchat/core/pkg/response"
+	"github.com/amicie-monami/music-library/internal/domain/dto"
+	"github.com/amicie-monami/music-library/pkg/httpkit"
+	"github.com/gorilla/mux"
 )
 
 type SongDeletter interface {
-	Delete(ctx context.Context, id int64) (int64, error)
+	Delete(ctx context.Context, id int64) error
 }
 
 // @Summary Удаление песни
@@ -24,28 +28,34 @@ type SongDeletter interface {
 // @Failure 500 {object} dto.Error "Внутреняя ошибка сервера."
 func DeleteSong(repo SongDeletter) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		songID, songIDVar, err := parsePathVarSongID(r)
+		songID, err := parsePathVarSongID(r)
 		if err != nil {
-			slog.Info(err.Error())
-			response.Json().BadRequest().Body(body{"error": "invalid song id", "song_id": songIDVar}).MustWrite(w)
+			sendError(w, err)
 			return
 		}
 
-		count, err := repo.Delete(r.Context(), songID)
-		if err != nil {
-			slog.Error(err.Error())
-			// needs refactoring: to get rid of the "magic" error
-			response.Json().InternalError().Body(body{"error": "internal server error"}).MustWrite(w)
+		if err := repo.Delete(r.Context(), songID); err != nil {
+			sendError(w, err)
 			return
 		}
 
-		if count == 0 {
-			slog.Info("not found song id=" + songIDVar)
-			response.Json().BadRequest().Body(body{"error": "song not found", "song_id": songID}).MustWrite(w)
-			return
-		}
-
-		response.Json().OK().MustWrite(w)
-		slog.Info("200")
+		slog.Info("song has been deleted", "id", songID)
+		httpkit.Ok(w, nil)
 	})
+}
+
+func parsePathVarSongID(r *http.Request) (int64, error) {
+	songID, err := strconv.ParseInt(mux.Vars(r)["id"], 0, 10)
+
+	if err != nil {
+		details := fmt.Sprintf("id=%s", mux.Vars(r)["id"])
+		return 0, dto.NewError(400, "invalid song id in url", "parsePathVarSongID", details, nil)
+	}
+
+	if songID <= 0 {
+		details := fmt.Sprintf("id=%s but must me > 0", mux.Vars(r)["id"])
+		return 0, dto.NewError(400, "invalid song id in url", "parsePathVarSongID", details, nil)
+	}
+
+	return songID, nil
 }

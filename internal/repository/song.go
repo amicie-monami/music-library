@@ -40,12 +40,14 @@ func NewSong(db dbContext) *Song {
 func (r *Song) Tx(ctx context.Context, txActions func() error) error {
 	db, ok := r.db.(*sqlx.DB)
 	if !ok {
-		return fmt.Errorf("unsupport database type: %v", reflect.TypeOf(r.db))
+		debugMessage := fmt.Sprintf("execute the tx, unsupport database type: %v", reflect.TypeOf(r.db))
+		return dto.NewError(500, "internal server error", "song.Tx", nil, debugMessage)
 	}
 
 	tx, err := db.BeginTxx(ctx, &sql.TxOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to begin the transaction: %s", err)
+		debugMessage := fmt.Errorf("failed to begin the transaction: %s", err)
+		return dto.NewError(500, "internal server error", "song.Tx", nil, debugMessage)
 	}
 
 	//change the context of the repository database to a transaction
@@ -68,7 +70,8 @@ func (r *Song) Tx(ctx context.Context, txActions func() error) error {
 
 	//commits the changes
 	if err = tx.Commit(); err != nil {
-		return err
+		debugMessage := fmt.Errorf("failed to commit the transaction: %s", err)
+		return dto.NewError(500, "internal server error", "song.Tx", nil, debugMessage)
 	}
 
 	return nil
@@ -88,18 +91,24 @@ func (r *Song) Create(ctx context.Context, song *model.Song) error {
 		Suffix("RETURNING id")
 
 	sql, args := query.MustSql()
-	return r.db.QueryRowContext(ctx, sql, args...).Scan(&song.ID)
+	if err := r.db.QueryRowContext(ctx, sql, args...).Scan(&song.ID); err != nil {
+		return wrapQueryExecError("song.Create", err)
+	}
+
+	return nil
 }
 
-func (r *Song) GetSongs(ctx context.Context, aggregation map[string]any) ([]dto.SongWithDetails, error) {
+func (r *Song) GetSongs(ctx context.Context, aggregation map[string]any) ([]*dto.SongWithDetails, error) {
 	slog.Debug("get song", "aggregation data=", aggregation)
 
+	//setup aggragation filters
 	columns := buildGetSongsColumnNames(aggregation["fields"].(string))
 	whereExpr, err := buildGetSongsWhereExpr(aggregation["filter"].(map[string]any))
 	if err != nil {
 		return nil, err
 	}
 
+	//mark the body of the sql query
 	queryBuilder := squirrel.
 		Select(columns...).
 		From("songs").
@@ -108,20 +117,28 @@ func (r *Song) GetSongs(ctx context.Context, aggregation map[string]any) ([]dto.
 		OrderBy("song_id").
 		PlaceholderFormat(squirrel.Dollar)
 
+	//setup pagination filters
 	if aggregation["limit"] != "" {
 		queryBuilder = queryBuilder.Limit(uint64(aggregation["limit"].(int64)))
 	} else {
 		queryBuilder = queryBuilder.Limit(1000)
 	}
-
 	if aggregation["offset"] != "" {
 		queryBuilder = queryBuilder.Offset(uint64(aggregation["offset"].(int64)))
 	}
 
+	//build sql query
 	query, args := queryBuilder.MustSql()
 
-	songs := make([]dto.SongWithDetails, 0)
-	return songs, r.db.SelectContext(ctx, &songs, query, args...)
+	//execution
+	songs := make([]*dto.SongWithDetails, 0)
+	if err := r.db.SelectContext(ctx, &songs, query, args...); err != nil {
+		return nil, wrapQueryExecError("song.GetSongs", err)
+	}
+
+	fmt.Println(query)
+
+	return songs, nil
 }
 
 func (r *Song) GetSongText(ctx context.Context, id int64) (*string, error) {
@@ -134,8 +151,19 @@ func (r *Song) GetSongText(ctx context.Context, id int64) (*string, error) {
 		PlaceholderFormat(squirrel.Dollar).
 		MustSql()
 
-	songText := new(string)
-	return songText, r.db.QueryRowContext(ctx, query, args...).Scan(songText)
+	songText := new(*string)
+	if err := r.db.QueryRowContext(ctx, query, args...).Scan(songText); err != nil {
+
+		if err == sql.ErrNoRows {
+			message := "could not found the song"
+			details := fmt.Sprintf("id=%d", id)
+			return nil, dto.NewError(400, message, "song.GetSongText", details, nil)
+		}
+
+		return nil, wrapQueryExecError("song.GetSongs", err)
+	}
+
+	return *songText, nil
 }
 
 func (r *Song) GetSongWithDetails(ctx context.Context, group string, title string) (*dto.SongWithDetails, error) {
@@ -160,19 +188,23 @@ func (r *Song) GetSongWithDetails(ctx context.Context, group string, title strin
 
 	err := r.db.GetContext(ctx, &songWithDetails, query, args...)
 	if err != nil {
+
 		if err == sql.ErrNoRows {
-			return nil, nil
+			message := "could not found the song"
+			details := fmt.Sprintf("song=%s, group=%s", title, group)
+			return nil, dto.NewError(400, message, "song.GetSongText", details, nil)
 		}
-		return nil, err
+
+		return nil, wrapQueryExecError("song.GetSongWithDetails", err)
 	}
 
 	return &songWithDetails, nil
 }
 
-func (r *Song) UpdateSong(ctx context.Context, song *model.Song) (int64, error) {
+func (r *Song) UpdateSong(ctx context.Context, song *model.Song) error {
 	slog.Debug("update song", "data", fmt.Sprintf("%+v", song))
 	if song == nil {
-		return 0, nil
+		return dto.NewError(500, "internal server error", "song.UpdateSong", nil, "song is nil")
 	}
 
 	table := "songs"
@@ -183,10 +215,20 @@ func (r *Song) UpdateSong(ctx context.Context, song *model.Song) (int64, error) 
 		"song_name":  song.Name,
 	}
 
-	return updateRowContext(ctx, r.db, table, primaryKeyEqauls, setMap)
+	affectedCount, err := updateRowContext(ctx, r.db, table, primaryKeyEqauls, setMap)
+	if err != nil {
+		return wrapQueryExecError("song.UpdateSong", err)
+	}
+
+	if affectedCount == 0 {
+		details := fmt.Sprintf("id=%d", song.ID)
+		return dto.NewError(400, "song not found", "song.UpdateSong", details, nil)
+	}
+
+	return nil
 }
 
-func (r *Song) UpdateSongDetails(ctx context.Context, details *model.SongDetail) (int64, error) {
+func (r *Song) UpdateSongDetails(ctx context.Context, details *model.SongDetail) error {
 	slog.Debug("update song details", "data", fmt.Sprintf("%+v", details))
 
 	table := "song_details"
@@ -198,10 +240,20 @@ func (r *Song) UpdateSongDetails(ctx context.Context, details *model.SongDetail)
 		"release_date": details.ReleaseDate,
 	}
 
-	return updateRowContext(ctx, r.db, table, primaryKeyEqauls, setMap)
+	affectedCount, err := updateRowContext(ctx, r.db, table, primaryKeyEqauls, setMap)
+	if err != nil {
+		return wrapQueryExecError("song.UpdateSong", err)
+	}
+
+	if affectedCount == 0 {
+		details := fmt.Sprintf("id=%d", details.SongID)
+		return dto.NewError(400, "song not found", "song.UpdateSong", details, nil)
+	}
+
+	return nil
 }
 
-func (r *Song) Delete(ctx context.Context, id int64) (int64, error) {
+func (r *Song) Delete(ctx context.Context, id int64) error {
 	slog.Debug("delete song", "id", id)
 
 	query, args := squirrel.
@@ -212,13 +264,28 @@ func (r *Song) Delete(ctx context.Context, id int64) (int64, error) {
 
 	result, err := r.db.ExecContext(ctx, query, args...)
 	if err != nil {
-		return 0, err
+		return wrapQueryExecError("song.Delete", err)
 	}
 
-	return result.RowsAffected()
+	affectedCount, err := result.RowsAffected()
+	if err != nil {
+		return wrapQueryExecError("song.Delete", err)
+	}
+
+	if affectedCount == 0 {
+		details := fmt.Sprintf("id=%d", id)
+		return dto.NewError(400, "song not found", "song.Delete", details, nil)
+	}
+
+	return nil
 }
 
 /// ------------ Helpers ------------ ///
+
+func wrapQueryExecError(source string, err error) *dto.Error {
+	debugMsg := fmt.Errorf("database error: %v", err)
+	return dto.NewError(500, "internal server error", source, nil, debugMsg)
+}
 
 func buildGetSongsColumnNames(columns string) []string {
 	if columns == "" {
@@ -254,9 +321,10 @@ func buildGetSongsWhereExpr(filter map[string]any) (squirrel.Sqlizer, error) {
 // buildSongIDCondition build comparison expression on song_id column [e.g. song_id >= 12]
 func buildSongIDCondition(paramSongID string) (squirrel.Sqlizer, error) {
 	if paramSongID == "" {
-		return nil, fmt.Errorf("invalid value of song_id param")
+		return nil, dto.NewError(400, "missing value in song_id param ", "buildSongIDCondition", nil, nil)
 	}
 
+	var err error
 	songIDConstraint := strings.Split(paramSongID, " ")
 
 	//assume that parameter hasn't comparison operator
@@ -264,21 +332,25 @@ func buildSongIDCondition(paramSongID string) (squirrel.Sqlizer, error) {
 	songID := songIDConstraint[0]
 
 	//if split returns two elements, that parameter must contain a comparision operator.
-	//Change default "=" on passed operator
+	//Change default "=" on param's operator
 	if len(songIDConstraint) == 2 {
-		comparison = parseComparison(songIDConstraint[0])
-		if comparison == "" {
-			return nil, fmt.Errorf("invalid comparison operator in sond_id param")
+		comparison, err = parseComparisonOperatorInSongIDParam(songIDConstraint[0])
+		if err != nil {
+			return nil, err
 		}
+
 		songID = songIDConstraint[1]
 
+		//if param has 2 and more values
 	} else if len(songIDConstraint) > 2 {
 		and := squirrel.And{}
+		//range for pairs [operator constraint, operator constraint]
 		for idx := 0; idx < len(songIDConstraint); idx += 2 {
-			comparison = parseComparison(songIDConstraint[idx])
-			if comparison == "" {
-				return nil, fmt.Errorf("invalid comparison operator in sond_id param: %s, %v", songIDConstraint[idx], songIDConstraint)
+			comparison, err = parseComparisonOperatorInSongIDParam(songIDConstraint[idx])
+			if err != nil {
+				return nil, err
 			}
+
 			songID = songIDConstraint[idx+1]
 			and = append(and, squirrel.Expr(fmt.Sprintf("song_id %s ?", comparison), songID))
 		}
@@ -288,11 +360,19 @@ func buildSongIDCondition(paramSongID string) (squirrel.Sqlizer, error) {
 
 	//validation
 	if _, err := strconv.ParseInt(songID, 10, 64); err != nil {
-		return nil, fmt.Errorf("invalid value in song_id param")
+		return nil, dto.NewError(400, "song_id comstraint must be a num", "buildSongIDCondition", songID, nil)
 	}
 
 	//build comparison expression fot the song_id column
 	return squirrel.Expr(fmt.Sprintf("song_id %s ?", comparison), songID), nil
+}
+
+func parseComparisonOperatorInSongIDParam(operator string) (string, error) {
+	comparison := parseComparison(operator)
+	if comparison == "" {
+		return "", dto.NewError(400, "invalid comparison operator in song_id param", "buildSongIDCondition", operator, nil)
+	}
+	return comparison, nil
 }
 
 // buildSongNameCondition builds an ILIKE expression (or multiple ILIKEs
@@ -305,7 +385,7 @@ func buildSongNameCondition(paramSongName string) (squirrel.Sqlizer, error) {
 // for the "group_name" column
 func buildGroupsCondition(paramGroups string) (squirrel.Sqlizer, error) {
 	if paramGroups == "" {
-		return nil, fmt.Errorf("invalid value of groups param")
+		return nil, dto.NewError(400, "missing value in groups param ", "buildSongIDCondition", nil, nil)
 	}
 	groups := strings.Split(paramGroups, " ")
 	for idx := range groups {
@@ -326,22 +406,21 @@ func buildLinkCondition(paramLink string) (squirrel.Sqlizer, error) {
 //   - Between expr(if the parameteris of the [date]-[date] kind)
 func buildReleaseDateCondition(paramReleaseDate string) (squirrel.Sqlizer, error) {
 	if paramReleaseDate == "" {
-		return nil, fmt.Errorf("invalid value of release_date param")
+		return nil, dto.NewError(400, "missing value in release_date param ", "buildSongIDCondition", nil, nil)
 	}
 
-	layout := "01.01.2006"
 	dateConstraint := strings.Split(paramReleaseDate, " ")
 
 	//release date parameter has param=[operator]+[date] kind
 	if len(dateConstraint) == 2 {
-		date, err := time.Parse(layout, dateConstraint[1])
+		date, err := parseDateInReleaseDateParam(dateConstraint[1])
 		if err != nil {
 			return nil, err
 		}
 
-		comparison := parseComparison(dateConstraint[0])
-		if comparison == "" {
-			return nil, fmt.Errorf("invalid comparison operator %s", dateConstraint[0])
+		comparison, err := parseComparisonOperatorInReleaseDateParam(dateConstraint[0])
+		if err != nil {
+			return nil, err
 		}
 
 		return squirrel.Expr(fmt.Sprintf("release_date %s ?", comparison), date), nil
@@ -350,28 +429,48 @@ func buildReleaseDateCondition(paramReleaseDate string) (squirrel.Sqlizer, error
 	dates := strings.Split(paramReleaseDate, "-")
 	//release date parameter has param=[date] kind
 	if len(dates) == 1 {
-		date, err := time.Parse(layout, dates[0])
+
+		date, err := parseDateInReleaseDateParam(dates[0])
 		if err != nil {
 			return nil, err
 		}
+
 		return squirrel.Eq{"release_date": date}, nil
 	}
 
 	//release date parameter has param=[date]-[date] kind
 	if len(dates) == 2 {
-		startDate, err := time.Parse(layout, dates[0])
+
+		startDate, err := parseDateInReleaseDateParam(dates[0])
 		if err != nil {
 			return nil, err
 		}
 
-		endDate, err := time.Parse(layout, dates[1])
+		endDate, err := parseDateInReleaseDateParam(dates[1])
 		if err != nil {
 			return nil, err
 		}
+
 		return squirrel.Expr("release_date BETWEEN ? AND ?", startDate, endDate), nil
 	}
 
-	return nil, fmt.Errorf("invalid value of release_date param=%s", paramReleaseDate)
+	return nil, dto.NewError(400, "failed to parse release_date param", "buildReleaseDateCondition", paramReleaseDate, nil)
+}
+
+func parseDateInReleaseDateParam(dateStr string) (time.Time, error) {
+	date, err := time.Parse("02.01.2006", dateStr)
+	if err != nil {
+		return time.Time{}, dto.NewError(400, "could not parse the release_date, expected format was dd.mm.yyyy", "buildReleaseDateCondition", dateStr, nil)
+	}
+	return date, nil
+}
+
+func parseComparisonOperatorInReleaseDateParam(operator string) (string, error) {
+	comparison := parseComparison(operator)
+	if comparison == "" {
+		return "", dto.NewError(400, "invalid comparison operator in release_date param", "buildReleaseDateCondition", operator, nil)
+	}
+	return comparison, nil
 }
 
 // buildSongTextCondition builds an ILIKE expression (or multiple ILIKEs

@@ -7,7 +7,6 @@ import (
 
 	"github.com/amicie-monami/music-library/internal/domain/dto"
 	"github.com/amicie-monami/music-library/pkg/httpkit"
-	"github.com/pawpawchat/core/pkg/response"
 )
 
 type songDetailsGetter interface {
@@ -21,28 +20,26 @@ type songDetailsGetter interface {
 // @Produce json
 // @Param group query string true "Название группы"
 // @Param song query string  true "Название песни"
-// @Success 201 {object} dto.SongWithDetails "Объект, описывающий основную и дополнительную информацию о песне."
+// @Success 201 {object} dto.GetSongDetailsResponse "Объект, описывающий основную и дополнительную информацию о песне."
 // @Failure 400 {object} dto.Error "Неверный запрос, некорректные значения параметров."
 // @Failure 500 {object} dto.Error "Внутреняя ошибка сервера."
 func GetSongDetails(repo songDetailsGetter) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		params, err := parseGetSongDetailsQueryParams(r)
 		if err != nil {
-			slog.Info(err.Error())
-			response.Json().BadRequest().Body(body{"error": err.Error()}).MustWrite(w)
+			sendError(w, err)
 			return
 		}
 
-		songWithDetails, err := repo.GetSongWithDetails(r.Context(), params["song"], params["title"])
+		songWithDetails, err := repo.GetSongWithDetails(r.Context(), params["group"], params["song"])
 		if err != nil {
-			slog.Error(err.Error())
-			// needs refactoring: to get rid of the "magic" error
-			response.Json().InternalError().Body(dto.Error{Message: "Internal server error"})
+			sendError(w, err)
 			return
 		}
 
-		response.Json().OK().Body(map[string]any{"song": songWithDetails}).MustWrite(w)
-		slog.Info("200")
+		slog.Info("song has been found", "id", songWithDetails.ID)
+		responseBody := dto.GetSongDetailsResponse{Song: songWithDetails}
+		httpkit.Ok(w, responseBody)
 	})
 }
 
@@ -52,12 +49,12 @@ func parseGetSongDetailsQueryParams(r *http.Request) (map[string]string, error) 
 
 	params["group"], err = httpkit.GetStrRequiredParam("group", r)
 	if err != nil {
-		return nil, err
+		return nil, dto.NewError(400, "group param is required", "parseGetSongDetailsQueryParams", nil, nil)
 	}
 
 	params["song"], err = httpkit.GetStrRequiredParam("song", r)
 	if err != nil {
-		return nil, err
+		return nil, dto.NewError(400, "song param is required", "parseGetSongDetailsQueryParams", nil, nil)
 	}
 
 	return params, nil

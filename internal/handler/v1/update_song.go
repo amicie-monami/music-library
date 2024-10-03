@@ -10,13 +10,13 @@ import (
 
 	"github.com/amicie-monami/music-library/internal/domain/dto"
 	"github.com/amicie-monami/music-library/internal/domain/model"
-	"github.com/pawpawchat/core/pkg/response"
+	"github.com/amicie-monami/music-library/pkg/httpkit"
 )
 
 type songDataUpdater interface {
 	Tx(ctx context.Context, txActions func() error) error
-	UpdateSong(ctx context.Context, song *model.Song) (count int64, err error)
-	UpdateSongDetails(ctx context.Context, details *model.SongDetail) (count int64, err error)
+	UpdateSong(ctx context.Context, song *model.Song) error
+	UpdateSongDetails(ctx context.Context, details *model.SongDetail) error
 }
 
 // @Summary Изменение данных песни
@@ -32,97 +32,71 @@ type songDataUpdater interface {
 // @Failure 500 {object} dto.Error "Внутреняя ошибка сервера."
 func UpdateSong(repo songDataUpdater) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		songID, songIDVar, err := parsePathVarSongID(r)
+		songID, err := parsePathVarSongID(r)
 		if err != nil {
-			slog.Info(err.Error())
-			response.Json().BadRequest().Body(body{"error": "invalid song id", "song_id": songIDVar}).MustWrite(w)
+			sendError(w, err)
 			return
 		}
 
 		//parse body
 		song, songDetails, err := parseUpdateSongBody(songID, r)
 		if err != nil {
-			slog.Info(err.Error())
-			response.Json().BadRequest().Body(body{"error": err.Error()}).MustWrite(w)
+			sendError(w, err)
 			return
 		}
 
 		//transaction actions
 		tx := func() error {
-			if song != nil {
-				count, err := repo.UpdateSong(r.Context(), song)
-				if err != nil {
-					slog.Error("failed to update a song data", "msg", err.Error())
-					// needs refactoring: to get rid of the "magic" error
-					response.Json().InternalError().Body(dto.Error{Message: "Internal server error"}).MustWrite(w)
-					return err
-
-				} else if count == 0 {
-					slog.Info("song not found", "song_id", songID)
-					response.Json().BadRequest().Body(body{"error": "song not found", "song_id": songID}).MustWrite(w)
-					return err
-				}
+			if song != nil && repo.UpdateSong(r.Context(), song) != nil {
+				return err
 			}
 
-			//sql query for song details
-			if songDetails != nil {
-				count, err := repo.UpdateSongDetails(r.Context(), songDetails)
-				if err != nil {
-					slog.Info("failed to update a song details", "msg", err.Error())
-					// needs refactoring: to get rid of the "magic" error
-					response.Json().InternalError().Body(dto.Error{Message: "Internal server error"}).MustWrite(w)
-					return err
-
-				} else if count == 0 {
-					slog.Info("song details not found", "song_id", songID)
-					response.Json().BadRequest().Body(body{"error": "song details not found", "song_id": songID}).MustWrite(w)
-					return err
-				}
+			if songDetails != nil && repo.UpdateSongDetails(r.Context(), songDetails) != nil {
+				return err
 			}
 			return nil
 		}
 
 		if err := repo.Tx(r.Context(), tx); err != nil {
+			sendError(w, err)
 			return
 		}
 
-		response.Json().OK().MustWrite(w)
-		slog.Info("200")
+		slog.Info("song have been successfully updated", "id", songID)
+		httpkit.Ok(w, nil)
 	})
 }
 
 func parseUpdateSongBody(songID int64, r *http.Request) (*model.Song, *model.SongDetail, error) {
 	var (
-		body        dto.UpdateSongRequest
+		requestBody dto.UpdateSongRequest
 		song        *model.Song
 		songDetails *model.SongDetail
 	)
 
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
 		return nil, nil, err
 	}
 
-	if body.Song != nil {
-		song = &model.Song{
-			ID:    songID,
-			Group: body.Song.Group,
-			Name:  body.Song.Name,
-		}
+	if requestBody.Group == "" && requestBody.Song == "" && requestBody.ReleaseDate == "" && requestBody.Link == "" && requestBody.Text == "" {
+		return nil, nil, dto.NewError(400, "missing the data for updates", "parseUpdateSongBody", nil, nil)
 	}
 
-	if body.SongDetails != nil {
-		songDetails = &model.SongDetail{
-			SongID: songID,
-			Text:   body.SongDetails.Text,
-			Link:   body.SongDetails.Link,
+	song = &model.Song{ID: songID, Group: requestBody.Group, Name: requestBody.Song}
+
+	songDetails = &model.SongDetail{SongID: songID, Text: &requestBody.Text, Link: &requestBody.Link}
+
+	//if release_date has been sent
+	if requestBody.ReleaseDate != "" {
+
+		//try to parse release_date
+		releaseDate, err := time.Parse("01.01.2006", requestBody.ReleaseDate)
+		if err != nil {
+			details := fmt.Sprintf("release_date=%s", requestBody.ReleaseDate)
+			return nil, nil, &dto.Error{Code: 400, Message: "failed to parse release_date field", Details: details}
 		}
-		if body.SongDetails.ReleaseDate != "" {
-			releaseDate, err := time.Parse("01.01.2006", body.SongDetails.ReleaseDate)
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to parse release_date field")
-			}
-			songDetails.ReleaseDate = &releaseDate
-		}
+
+		songDetails.ReleaseDate = &releaseDate
 	}
 
 	return song, songDetails, nil

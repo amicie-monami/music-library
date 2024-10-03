@@ -12,7 +12,7 @@ func configureRouter(router *mux.Router, songRepo *repository.Song) {
 
 	router.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
 
-	router.Handle("/api/v1/songs", middleware.Log(handler.GetSongsData(songRepo))).Methods("GET")
+	router.Handle("/api/v1/songs", middleware.Log(handler.GetSongs(songRepo))).Methods("GET")
 
 	router.Handle("/api/v1/songs/{id}/lyrics", middleware.Log(handler.GetSongText(songRepo))).Methods("GET")
 

@@ -1,8 +1,11 @@
 package dto
 
 type UpdateSongRequest struct {
-	Song        *Song        `json:"song"`
-	SongDetails *SongDetails `json:"song_details"`
+	Group       string `json:"group,omitempty"`
+	Song        string `json:"song,omitempty"`
+	Text        string `json:"text,omitempty"`
+	Link        string `json:"link,omitempty"`
+	ReleaseDate string `json:"release_date,omitempty"`
 }
 
 type AddSongRequest struct {

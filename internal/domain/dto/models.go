@@ -1,8 +1,9 @@
 package dto
 
 type Song struct {
+	ID    int64  `json:"song_id,omitempty"`
 	Group string `json:"group,omitempty"`
-	Name  string `json:"song,omitempty"`
+	Name  string `json:"title,omitempty"`
 }
 
 type SongDetails struct {

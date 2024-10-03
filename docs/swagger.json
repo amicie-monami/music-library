@@ -1,7 +1,7 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "API for managing songs in the music library.",
+        "description": "API for managing songs in the music library",
         "title": "Music Library API",
         "contact": {},
         "version": "1.0"
@@ -39,7 +39,7 @@
                     "201": {
                         "description": "Объект, описывающий основную и дополнительную информацию о песне.",
                         "schema": {
-                            "$ref": "#/definitions/dto.SongWithDetails"
+                            "$ref": "#/definitions/dto.GetSongDetailsResponse"
                         }
                     },
                     "400": {
@@ -138,10 +138,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "type": "array",
-                                "items": {
-                                    "$ref": "#/definitions/dto.SongWithDetails"
-                                }
+                                "$ref": "#/definitions/dto.GetSongsResponse"
                             }
                         }
                     },
@@ -186,7 +183,7 @@
                     "201": {
                         "description": "Объект, описывающий добавленную песню.",
                         "schema": {
-                            "$ref": "#/definitions/model.Song"
+                            "$ref": "#/definitions/dto.AddSongResponse"
                         }
                     },
                     "400": {
@@ -368,12 +365,28 @@
                 }
             }
         },
+        "dto.AddSongResponse": {
+            "type": "object",
+            "properties": {
+                "song": {
+                    "$ref": "#/definitions/dto.Song"
+                }
+            }
+        },
         "dto.Error": {
             "type": "object",
             "properties": {
                 "details": {},
                 "message": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.GetSongDetailsResponse": {
+            "type": "object",
+            "properties": {
+                "song": {
+                    "$ref": "#/definitions/dto.SongWithDetails"
                 }
             }
         },
@@ -391,27 +404,27 @@
                 }
             }
         },
+        "dto.GetSongsResponse": {
+            "type": "object",
+            "properties": {
+                "songs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.SongWithDetails"
+                    }
+                }
+            }
+        },
         "dto.Song": {
             "type": "object",
             "properties": {
                 "group": {
                     "type": "string"
                 },
-                "song": {
-                    "type": "string"
-                }
-            }
-        },
-        "dto.SongDetails": {
-            "type": "object",
-            "properties": {
-                "link": {
-                    "type": "string"
+                "song_id": {
+                    "type": "integer"
                 },
-                "release_date": {
-                    "type": "string"
-                },
-                "text": {
+                "title": {
                     "type": "string"
                 }
             }
@@ -442,24 +455,19 @@
         "dto.UpdateSongRequest": {
             "type": "object",
             "properties": {
-                "song": {
-                    "$ref": "#/definitions/dto.Song"
-                },
-                "song_details": {
-                    "$ref": "#/definitions/dto.SongDetails"
-                }
-            }
-        },
-        "model.Song": {
-            "type": "object",
-            "properties": {
                 "group": {
                     "type": "string"
                 },
-                "id": {
-                    "type": "integer"
+                "link": {
+                    "type": "string"
                 },
-                "name": {
+                "release_date": {
+                    "type": "string"
+                },
+                "song": {
+                    "type": "string"
+                },
+                "text": {
                     "type": "string"
                 }
             }

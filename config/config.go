@@ -9,8 +9,10 @@ import (
 )
 
 var envFilePath *string
+var appEnv *string
 
 func init() {
+	appEnv = flag.String("env", "stage", "application environment, can take one value from [stage, test] ")
 	envFilePath = flag.String("config", ".env", "path to the .env configuration file")
 }
 
@@ -45,6 +47,11 @@ func MustLoadFromEnv() *Config {
 		log.Fatal("failed to parse .env file", err)
 	}
 
+	dbSourceEnvVar := "DATABASE_SOURCE"
+	if *appEnv == "test" {
+		dbSourceEnvVar = "TEST_DATABASE_SOURCE"
+	}
+
 	return &Config{
 		Server: ServerConfig{
 			Addr:           env["SERVER_ADDR"],
@@ -54,7 +61,7 @@ func MustLoadFromEnv() *Config {
 			MaxHeaderBytes: mustParseDigit(env["SERVER_MAX_HEADER_BYTES"]),
 		},
 		Database: DatabaseConfig{
-			Source: env["DATABASE_SOURCE"],
+			Source: env[dbSourceEnvVar],
 		},
 	}
 }

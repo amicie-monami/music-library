@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/squirrel"
+	"github.com/amicie-monami/music-library/internal/domain/dto"
 )
 
 // updateRow Updates a row in the specified table.
@@ -106,7 +107,8 @@ func buildParamBasedAndConditions(params map[string]any, conditionResolvers map[
 //   - error: An error if the provided patterns string is empty.
 func buildILikeCondition(columnName string, patterns string) (squirrel.Sqlizer, error) {
 	if patterns == "" {
-		return nil, fmt.Errorf("invalid value of %s param", columnName)
+		message := fmt.Sprintf("missing value in %s param", columnName)
+		return nil, dto.NewError(400, message, "buildILikeCondition", "", nil)
 	}
 
 	patterns = strings.ReplaceAll(patterns, "*", "%")
@@ -124,6 +126,10 @@ func buildILikeCondition(columnName string, patterns string) (squirrel.Sqlizer, 
 //
 //	Supported values are:
 //	- "gt", "ge", "lt", "le", "ne", "eq"
+//
+// Returns
+//   - "" if operator is unknown
+//   - equals sql operator
 func parseComparison(value string) string {
 	switch value {
 	case "gt":

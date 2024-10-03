@@ -7,11 +7,21 @@ definitions:
       song:
         type: string
     type: object
+  dto.AddSongResponse:
+    properties:
+      song:
+        $ref: '#/definitions/dto.Song'
+    type: object
   dto.Error:
     properties:
       details: {}
       message:
         type: string
+    type: object
+  dto.GetSongDetailsResponse:
+    properties:
+      song:
+        $ref: '#/definitions/dto.SongWithDetails'
     type: object
   dto.GetSongTextResponse:
     properties:
@@ -22,20 +32,20 @@ definitions:
       song_id:
         type: integer
     type: object
+  dto.GetSongsResponse:
+    properties:
+      songs:
+        items:
+          $ref: '#/definitions/dto.SongWithDetails'
+        type: array
+    type: object
   dto.Song:
     properties:
       group:
         type: string
-      song:
-        type: string
-    type: object
-  dto.SongDetails:
-    properties:
-      link:
-        type: string
-      release_date:
-        type: string
-      text:
+      song_id:
+        type: integer
+      title:
         type: string
     type: object
   dto.SongWithDetails:
@@ -55,24 +65,21 @@ definitions:
     type: object
   dto.UpdateSongRequest:
     properties:
-      song:
-        $ref: '#/definitions/dto.Song'
-      song_details:
-        $ref: '#/definitions/dto.SongDetails'
-    type: object
-  model.Song:
-    properties:
       group:
         type: string
-      id:
-        type: integer
-      name:
+      link:
+        type: string
+      release_date:
+        type: string
+      song:
+        type: string
+      text:
         type: string
     type: object
 host: localhost:8080
 info:
   contact: {}
-  description: API for managing songs in the music library.
+  description: API for managing songs in the music library
   title: Music Library API
   version: "1.0"
 paths:
@@ -97,7 +104,7 @@ paths:
           description: Объект, описывающий основную и дополнительную информацию о
             песне.
           schema:
-            $ref: '#/definitions/dto.SongWithDetails'
+            $ref: '#/definitions/dto.GetSongDetailsResponse'
         "400":
           description: Неверный запрос, некорректные значения параметров.
           schema:
@@ -183,9 +190,7 @@ paths:
           description: Список песен, прошедших аггрегацию данных.
           schema:
             items:
-              items:
-                $ref: '#/definitions/dto.SongWithDetails'
-              type: array
+              $ref: '#/definitions/dto.GetSongsResponse'
             type: array
         "400":
           description: Неверный запрос, некорректные значения параметров.
@@ -215,7 +220,7 @@ paths:
         "201":
           description: Объект, описывающий добавленную песню.
           schema:
-            $ref: '#/definitions/model.Song'
+            $ref: '#/definitions/dto.AddSongResponse'
         "400":
           description: Неверный запрос, некорректные значения параметров.
           schema:

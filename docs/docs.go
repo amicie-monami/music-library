@@ -45,7 +45,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Объект, описывающий основную и дополнительную информацию о песне.",
                         "schema": {
-                            "$ref": "#/definitions/dto.SongWithDetails"
+                            "$ref": "#/definitions/dto.GetSongDetailsResponse"
                         }
                     },
                     "400": {
@@ -144,10 +144,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "type": "array",
-                                "items": {
-                                    "$ref": "#/definitions/dto.SongWithDetails"
-                                }
+                                "$ref": "#/definitions/dto.GetSongsResponse"
                             }
                         }
                     },
@@ -192,7 +189,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Объект, описывающий добавленную песню.",
                         "schema": {
-                            "$ref": "#/definitions/model.Song"
+                            "$ref": "#/definitions/dto.AddSongResponse"
                         }
                     },
                     "400": {
@@ -374,12 +371,28 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.AddSongResponse": {
+            "type": "object",
+            "properties": {
+                "song": {
+                    "$ref": "#/definitions/dto.Song"
+                }
+            }
+        },
         "dto.Error": {
             "type": "object",
             "properties": {
                 "details": {},
                 "message": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.GetSongDetailsResponse": {
+            "type": "object",
+            "properties": {
+                "song": {
+                    "$ref": "#/definitions/dto.SongWithDetails"
                 }
             }
         },
@@ -397,27 +410,27 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.GetSongsResponse": {
+            "type": "object",
+            "properties": {
+                "songs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.SongWithDetails"
+                    }
+                }
+            }
+        },
         "dto.Song": {
             "type": "object",
             "properties": {
                 "group": {
                     "type": "string"
                 },
-                "song": {
-                    "type": "string"
-                }
-            }
-        },
-        "dto.SongDetails": {
-            "type": "object",
-            "properties": {
-                "link": {
-                    "type": "string"
+                "song_id": {
+                    "type": "integer"
                 },
-                "release_date": {
-                    "type": "string"
-                },
-                "text": {
+                "title": {
                     "type": "string"
                 }
             }
@@ -448,24 +461,19 @@ const docTemplate = `{
         "dto.UpdateSongRequest": {
             "type": "object",
             "properties": {
-                "song": {
-                    "$ref": "#/definitions/dto.Song"
-                },
-                "song_details": {
-                    "$ref": "#/definitions/dto.SongDetails"
-                }
-            }
-        },
-        "model.Song": {
-            "type": "object",
-            "properties": {
                 "group": {
                     "type": "string"
                 },
-                "id": {
-                    "type": "integer"
+                "link": {
+                    "type": "string"
                 },
-                "name": {
+                "release_date": {
+                    "type": "string"
+                },
+                "song": {
+                    "type": "string"
+                },
+                "text": {
                     "type": "string"
                 }
             }
@@ -480,7 +488,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/api/v1",
 	Schemes:          []string{},
 	Title:            "Music Library API",
-	Description:      "API for managing songs in the music library.",
+	Description:      "API for managing songs in the music library",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

@@ -15,7 +15,7 @@ import (
 
 // @title Music Library API
 // @version 1.0
-// @description API for managing songs in the music library.
+// @description API for managing songs in the music library
 // @host localhost:8080
 // @BasePath /api/v1
 func main() {
@@ -23,7 +23,7 @@ func main() {
 	flag.Parse()
 	config := config.MustLoadFromEnv()
 	// subcribe on terminate and quit signals
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGQUIT)
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	go func() {
 		<-ctx.Done()
 		cancel()

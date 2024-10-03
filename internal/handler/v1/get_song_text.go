@@ -2,15 +2,12 @@ package handler
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/amicie-monami/music-library/internal/domain/dto"
 	"github.com/amicie-monami/music-library/pkg/httpkit"
-	"github.com/pawpawchat/core/pkg/response"
 )
 
 type songTextGetter interface {
@@ -31,61 +28,47 @@ type songTextGetter interface {
 // @Failure 500 {object} dto.Error "Внутреняя ошибка сервера."
 func GetSongText(repo songTextGetter) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		songID, songIDVar, err := parsePathVarSongID(r)
+		songID, err := parsePathVarSongID(r)
 		if err != nil {
-			slog.Info(err.Error())
-			response.Json().BadRequest().Body(body{"error": "invalid song id", "song_id": songIDVar}).MustWrite(w)
+			sendError(w, err)
 			return
 		}
 
 		limit, offset, err := parseGetSongTextQueryParams(r)
 		if err != nil {
-			slog.Info(err.Error())
-			response.Json().BadRequest().Body(body{"error": err.Error()}).MustWrite(w)
+			sendError(w, err)
 			return
 		}
 
 		songText, err := repo.GetSongText(r.Context(), songID)
 		if err != nil {
-
-			if err == sql.ErrNoRows {
-				slog.Info("400 No data")
-				response.Json().
-					BadRequest().
-					Body(dto.Error{
-						Message: "There is no information about the lyrics of a song with this identifier",
-						Details: fmt.Sprintf("song_id=%s", songIDVar),
-					}).
-					MustWrite(w)
-				return
-			}
-
-			slog.Error("500: " + err.Error())
-			// needs refactoring: to get rid of the "magic" error
-			response.Json().InternalError().Body(dto.Error{Message: "Internal server error"})
+			sendError(w, err)
 			return
 		}
 
 		couplets, err := coupletsPagination(songText, limit, offset)
 		if err != nil {
-			response.Json().BadRequest().Body(body{"error": err.Error()}).MustWrite(w)
+			sendError(w, err)
 			return
 		}
 
-		slog.Info("200")
-		response.Json().OK().Body(dto.GetSongTextResponse{Couplets: couplets, SongID: songID}).MustWrite(w)
+		slog.Info("song lyrics found", "song_id", songID)
+		responseBody := dto.GetSongTextResponse{Couplets: couplets, SongID: songID}
+		httpkit.Ok(w, responseBody)
 	})
 }
 
 func parseGetSongTextQueryParams(r *http.Request) (int64, int64, error) {
-	limit, err := httpkit.GetIntParam("limit", r)
+	limit, err := parseLimitParam(r)
 	if err != nil {
 		return 0, 0, err
 	}
-	offset, err := httpkit.GetIntParam("offset", r)
+
+	offset, err := parseOffsetParam(r)
 	if err != nil {
 		return 0, 0, err
 	}
+
 	return limit, offset, nil
 }
 
