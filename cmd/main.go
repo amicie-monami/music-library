@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"log/slog"
 	"os/signal"
 	"syscall"
 
@@ -19,14 +18,14 @@ import (
 // @host localhost:8080
 // @BasePath /api/v1
 func main() {
-	slog.SetLogLoggerLevel(slog.LevelDebug)
 	flag.Parse()
-	config := config.MustLoadFromEnv()
+	cfg := config.MustLoadFromEnv()
+	config.ConfigureSlogLogger(cfg.LogLevel)
 	// subcribe on terminate and quit signals
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	go func() {
 		<-ctx.Done()
 		cancel()
 	}()
-	app.Run(ctx, config)
+	app.Run(ctx, cfg)
 }

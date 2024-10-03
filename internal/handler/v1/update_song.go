@@ -62,7 +62,7 @@ func UpdateSong(repo songDataUpdater) http.Handler {
 			return
 		}
 
-		slog.Info("song have been successfully updated", "id", songID)
+		slog.Info("song has been successfully updated", "id", songID)
 		httpkit.Ok(w, nil)
 	})
 }

@@ -3,6 +3,7 @@ package config
 import (
 	"flag"
 	"log"
+	"log/slog"
 	"strconv"
 
 	"github.com/joho/godotenv"
@@ -33,6 +34,7 @@ type DatabaseConfig struct {
 type Config struct {
 	Server   ServerConfig
 	Database DatabaseConfig
+	LogLevel string
 }
 
 // MustLoadFromEnv loads config from .env file
@@ -63,6 +65,7 @@ func MustLoadFromEnv() *Config {
 		Database: DatabaseConfig{
 			Source: env[dbSourceEnvVar],
 		},
+		LogLevel: env["LOG_LEVEL"],
 	}
 }
 
@@ -72,4 +75,19 @@ func mustParseDigit(raw string) int {
 		log.Fatalf("failed to parse str=%s", raw)
 	}
 	return num
+}
+
+func ConfigureSlogLogger(logLevel string) {
+	if logLevel == "debug" {
+		slog.SetLogLoggerLevel(slog.LevelDebug)
+
+	} else if logLevel == "info" {
+		slog.SetLogLoggerLevel(slog.LevelInfo)
+
+	} else if logLevel == "error" {
+		slog.SetLogLoggerLevel(slog.LevelError)
+
+	} else {
+		slog.SetLogLoggerLevel(slog.LevelInfo)
+	}
 }

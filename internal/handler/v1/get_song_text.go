@@ -52,7 +52,7 @@ func GetSongText(repo songTextGetter) http.Handler {
 			return
 		}
 
-		slog.Info("song lyrics found", "song_id", songID)
+		slog.Info("song lyrics have been found", "song_id", songID)
 		responseBody := dto.GetSongTextResponse{Couplets: couplets, SongID: songID}
 		httpkit.Ok(w, responseBody)
 	})
